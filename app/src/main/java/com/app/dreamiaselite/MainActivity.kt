@@ -69,9 +69,11 @@ import com.app.dreamiaselite.ui.screen.screens.about.AboutPrivacyScreen
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import androidx.compose.runtime.produceState
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
+        installSplashScreen()
         super.onCreate(savedInstanceState)
         setContent {
             var isDarkMode by rememberSaveable { mutableStateOf(false) }
