@@ -17,9 +17,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -41,6 +40,45 @@ data class HomeSectionItem(
     val tag: String,
     val meta: String
 )
+
+data class LoadMoreState(
+    val visibleCount: Int,
+    val buttonLabel: String?,
+    val onClick: () -> Unit
+)
+
+@Composable
+fun rememberLoadMoreState(
+    totalItems: Int,
+    initialVisible: Int,
+    steps: List<Int> = listOf(4, 5)
+): LoadMoreState {
+    var visibleCount by rememberSaveable { mutableStateOf(initialVisible) }
+    var stepIndex by rememberSaveable { mutableStateOf(0) }
+
+    LaunchedEffect(totalItems) {
+        visibleCount = initialVisible.coerceAtMost(totalItems)
+        stepIndex = 0
+    }
+
+    val hasMore = visibleCount < totalItems
+    val label = when {
+        !hasMore -> null
+        stepIndex == 0 -> "View all"
+        else -> "View more"
+    }
+
+    return LoadMoreState(
+        visibleCount = visibleCount,
+        buttonLabel = label,
+        onClick = onClick@{
+            if (!hasMore) return@onClick
+            val increment = steps.getOrNull(stepIndex) ?: (totalItems - visibleCount)
+            visibleCount = (visibleCount + increment).coerceAtMost(totalItems)
+            stepIndex += 1
+        }
+    )
+}
 
 //-------------------------------------------------------
 // MAIN DASHBOARD SCREEN
@@ -69,6 +107,60 @@ fun DashboardScreen(navController: NavHostController, userName: String? = null) 
                 "Polity • GS2",
                 "Current Affairs",
                 "Judgment highlights"
+            ),
+            HomeSectionItem(
+                "India’s GDP forecast updated",
+                "Economy • GS3",
+                "Current Affairs",
+                "Data-driven brief"
+            ),
+            HomeSectionItem(
+                "New MSP changes explained",
+                "Agriculture • GS3",
+                "Current Affairs",
+                "What to watch"
+            ),
+            HomeSectionItem(
+                "Blue Economy push",
+                "Environment • GS3",
+                "Current Affairs",
+                "Schemes & targets"
+            ),
+            HomeSectionItem(
+                "AI regulation paper",
+                "Sci-Tech • GS3",
+                "Current Affairs",
+                "Global snapshots"
+            ),
+            HomeSectionItem(
+                "G20 outcomes tracker",
+                "IR • GS2",
+                "Current Affairs",
+                "Action points"
+            ),
+            HomeSectionItem(
+                "Mission LiFE updates",
+                "Environment • GS3",
+                "Current Affairs",
+                "Targets & states"
+            ),
+            HomeSectionItem(
+                "NATO expansion brief",
+                "IR • GS2",
+                "Current Affairs",
+                "Timeline & map"
+            ),
+            HomeSectionItem(
+                "Quantum tech roadmap",
+                "Sci-Tech • GS3",
+                "Current Affairs",
+                "Key milestones"
+            ),
+            HomeSectionItem(
+                "Forest (Amendment) Act",
+                "Environment • GS3",
+                "Current Affairs",
+                "Core provisions"
             )
         )
     }
@@ -92,6 +184,60 @@ fun DashboardScreen(navController: NavHostController, userName: String? = null) 
                 "35 Q • Inflation",
                 "Test Series",
                 "Adaptive difficulty"
+            ),
+            HomeSectionItem(
+                "CSAT Speed Drill",
+                "20 Q • Quant/Reasoning",
+                "Test Series",
+                "Timed practice"
+            ),
+            HomeSectionItem(
+                "Modern History Mini",
+                "15 Q • Spectrum",
+                "Test Series",
+                "Revise fast"
+            ),
+            HomeSectionItem(
+                "Environment Snapshot",
+                "25 Q • Acts & bodies",
+                "Test Series",
+                "Image-heavy"
+            ),
+            HomeSectionItem(
+                "Ancient & Medieval Mix",
+                "28 Q • Culture focus",
+                "Test Series",
+                "Memory hooks"
+            ),
+            HomeSectionItem(
+                "Art & Culture flash",
+                "18 Q • Paintings/Architecture",
+                "Test Series",
+                "Scoring set"
+            ),
+            HomeSectionItem(
+                "Schemes drill",
+                "22 Q • Ministries & themes",
+                "Test Series",
+                "Updated monthly"
+            ),
+            HomeSectionItem(
+                "Mapping workout",
+                "20 Q • Atlas based",
+                "Test Series",
+                "Fast attempts"
+            ),
+            HomeSectionItem(
+                "Science & Tech",
+                "24 Q • Space/Defence",
+                "Test Series",
+                "CA-linked"
+            ),
+            HomeSectionItem(
+                "Ethics mini caselets",
+                "12 Q • GS4",
+                "Test Series",
+                "Situational MCQs"
             )
         )
     }
@@ -155,16 +301,23 @@ private fun DashboardSection(
     items: List<HomeSectionItem>,
     highlightColor: Color
 ) {
+    val loadState = rememberLoadMoreState(
+        totalItems = items.size,
+        initialVisible = 3
+    )
+    val visibleItems = items.take(loadState.visibleCount)
+
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         SectionHeader(
             title = title,
             caption = caption,
             pillColor = pillColor,
-            onViewAll = {}
+            viewButtonLabel = loadState.buttonLabel,
+            onViewAction = loadState.onClick
         )
 
         HorizontalSectionList(
-            items = items,
+            items = visibleItems,
             highlightColor = highlightColor
         )
     }
@@ -328,7 +481,8 @@ fun SectionHeader(
     title: String,
     caption: String,
     pillColor: Color,
-    onViewAll: () -> Unit
+    viewButtonLabel: String?,
+    onViewAction: () -> Unit
 ) {
 
     Row(
@@ -355,20 +509,22 @@ fun SectionHeader(
             )
         }
 
-        Box(
-            modifier = Modifier
-                .clip(RoundedCornerShape(50))
-                .background(pillColor.copy(alpha = 0.20f))
-                .clickable { onViewAll() }
-                .padding(horizontal = 14.dp, vertical = 6.dp)
-        ) {
-            Text(
-                text = "View all",
-                color = pillColor,
-                style = MaterialTheme.typography.bodyMedium.copy(
-                    fontWeight = FontWeight.SemiBold
+        viewButtonLabel?.let { label ->
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(50))
+                    .background(pillColor.copy(alpha = 0.20f))
+                    .clickable { onViewAction() }
+                    .padding(horizontal = 14.dp, vertical = 6.dp)
+            ) {
+                Text(
+                    text = label,
+                    color = pillColor,
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        fontWeight = FontWeight.SemiBold
+                    )
                 )
-            )
+            }
         }
     }
 }

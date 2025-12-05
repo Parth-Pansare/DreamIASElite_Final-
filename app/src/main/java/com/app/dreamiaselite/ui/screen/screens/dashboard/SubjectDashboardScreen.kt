@@ -43,46 +43,105 @@ data class TopicProgress(val title: String, val progress: String)
 fun SubjectDashboardScreen(subject: String, navController: NavHostController) {
 
     val dailyMcqs = remember(subject) {
-        listOf(
-            SubjectCardItem("5 Quick MCQs", "Mixed difficulty", "Auto-filtered to $subject"),
-            SubjectCardItem("Timed drill • 8 Qs", "4 mins", "Great for warm-up")
-        )
+        buildList {
+            add(SubjectCardItem("5 Quick MCQs", "Mixed difficulty", "Auto-filtered to $subject"))
+            add(SubjectCardItem("Timed drill • 8 Qs", "4 mins", "Great for warm-up"))
+            repeat(9) { idx ->
+                add(
+                    SubjectCardItem(
+                        "MCQ sprint ${idx + 1}",
+                        "${12 + idx} Q • mixed",
+                        "Focus: $subject practice"
+                    )
+                )
+            }
+        }
     }
 
     val topics = remember(subject) {
-        listOf(
-            TopicProgress("$subject Basics", "70%"),
-            TopicProgress("Important Acts", "40%"),
-            TopicProgress("Previous Year Themes", "55%")
-        )
+        buildList {
+            add(TopicProgress("$subject Basics", "70%"))
+            add(TopicProgress("Important Acts", "40%"))
+            add(TopicProgress("Previous Year Themes", "55%"))
+            val topicNames = listOf(
+                "Schemes & Policies",
+                "Maps & Locations",
+                "Economic Concepts",
+                "Environment links",
+                "Science updates",
+                "Modern History",
+                "Culture & Art",
+                "Govt Programs",
+                "International Relations"
+            )
+            topicNames.forEachIndexed { idx, title ->
+                add(TopicProgress(title, "${45 + (idx * 5)}%"))
+            }
+        }
     }
 
     val caArticles = remember(subject) {
-        listOf(
-            SubjectCardItem("Key $subject CA digest", "3 articles", "Updated today"),
-            SubjectCardItem("Exam-oriented briefs", "2 mins each", "Flag for revision")
-        )
+        buildList {
+            add(SubjectCardItem("Key $subject CA digest", "3 articles", "Updated today"))
+            add(SubjectCardItem("Exam-oriented briefs", "2 mins each", "Flag for revision"))
+            repeat(9) { idx ->
+                add(
+                    SubjectCardItem(
+                        "$subject current note ${idx + 1}",
+                        "Quick brief ${idx + 1}",
+                        "New in the last week"
+                    )
+                )
+            }
+        }
     }
 
     val tests = remember(subject) {
-        listOf(
-            SubjectCardItem("$subject sectional test", "30 Q • Adaptive", "Prev best: 68%"),
-            SubjectCardItem("Mini drill", "10 Q • Timed", "Good for quick check")
-        )
+        buildList {
+            add(SubjectCardItem("$subject sectional test", "30 Q • Adaptive", "Prev best: 68%"))
+            add(SubjectCardItem("Mini drill", "10 Q • Timed", "Good for quick check"))
+            repeat(9) { idx ->
+                add(
+                    SubjectCardItem(
+                        "$subject practice set ${idx + 1}",
+                        "${18 + idx} Q • Mixed",
+                        "Sprint ${idx + 1}"
+                    )
+                )
+            }
+        }
     }
 
     val notes = remember(subject) {
-        listOf(
-            SubjectCardItem("Last opened note", "Annotations saved", "Resume"),
-            SubjectCardItem("Flashcards", "Key terms & dates", "Review 5 cards")
-        )
+        buildList {
+            add(SubjectCardItem("Last opened note", "Annotations saved", "Resume"))
+            add(SubjectCardItem("Flashcards", "Key terms & dates", "Review 5 cards"))
+            repeat(9) { idx ->
+                add(
+                    SubjectCardItem(
+                        "$subject note pack ${idx + 1}",
+                        "Concise bullets",
+                        "Ready to revise"
+                    )
+                )
+            }
+        }
     }
 
     val pyqs = remember(subject) {
-        listOf(
-            SubjectCardItem("$subject PYQ set", "10 Q • 2023-2021", "Avg accuracy 62%"),
-            SubjectCardItem("High-yield PYQs", "Curated mix", "Revise with notes")
-        )
+        buildList {
+            add(SubjectCardItem("$subject PYQ set", "10 Q • 2023-2021", "Avg accuracy 62%"))
+            add(SubjectCardItem("High-yield PYQs", "Curated mix", "Revise with notes"))
+            repeat(9) { idx ->
+                add(
+                    SubjectCardItem(
+                        "$subject PYQ drill ${idx + 1}",
+                        "8 Q • Mixed years",
+                        "Theme-wise practice"
+                    )
+                )
+            }
+        }
     }
 
     LazyColumn(
@@ -200,11 +259,23 @@ private fun SubjectSection(
     pillColor: Color,
     items: List<SubjectCardItem>
 ) {
+    val loadState = rememberLoadMoreState(
+        totalItems = items.size,
+        initialVisible = 2
+    )
+    val visibleItems = items.take(loadState.visibleCount)
+
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        SectionHeader(title = title, caption = caption, pillColor = pillColor) {}
+        SectionHeader(
+            title = title,
+            caption = caption,
+            pillColor = pillColor,
+            viewButtonLabel = loadState.buttonLabel,
+            onViewAction = loadState.onClick
+        )
 
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            items.forEach { item ->
+            visibleItems.forEach { item ->
                 SubjectCard(item, pillColor)
             }
         }
@@ -218,10 +289,22 @@ private fun TopicListSection(
     pillColor: Color,
     topics: List<TopicProgress>
 ) {
+    val loadState = rememberLoadMoreState(
+        totalItems = topics.size,
+        initialVisible = 3
+    )
+    val visibleTopics = topics.take(loadState.visibleCount)
+
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        SectionHeader(title = title, caption = caption, pillColor = pillColor) {}
+        SectionHeader(
+            title = title,
+            caption = caption,
+            pillColor = pillColor,
+            viewButtonLabel = loadState.buttonLabel,
+            onViewAction = loadState.onClick
+        )
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            topics.forEach { topic ->
+            visibleTopics.forEach { topic ->
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(14.dp),

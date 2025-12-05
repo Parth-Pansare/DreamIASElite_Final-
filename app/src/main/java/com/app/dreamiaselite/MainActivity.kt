@@ -409,7 +409,11 @@ fun DrawerHeader(userName: String?, userEmail: String?, avatarUrl: String?) {
 
             Column {
                 Text(displayName, fontWeight = FontWeight.Bold)
-                Text(displayEmail, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f))
+                Text(
+                    displayEmail,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                    style = MaterialTheme.typography.bodySmall
+                )
             }
         }
     }
