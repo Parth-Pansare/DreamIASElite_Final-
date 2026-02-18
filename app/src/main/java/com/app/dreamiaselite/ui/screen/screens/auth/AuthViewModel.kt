@@ -12,15 +12,17 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.runBlocking
 import java.io.File
 import java.io.FileOutputStream
 
 data class AuthUiState(
     val isAuthenticated: Boolean = false,
-    val isLoading: Boolean = true,
+    val isLoading: Boolean = false,
     val errorMessage: String? = null,
     val currentUserEmail: String? = null,
     val currentUserName: String? = null,
@@ -43,7 +45,23 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         )
     }
 
-    private val _uiState = MutableStateFlow(AuthUiState())
+    private val initialState: AuthUiState = runBlocking {
+        val email = runCatching { authPrefs.currentUserEmail.first() }.getOrNull()
+        val user = runCatching { email?.let { repository.getUserByEmail(it) } }.getOrNull()
+        val prefAvatar = runCatching { email?.let { repository.getStoredAvatar(it) } }.getOrNull()
+        AuthUiState(
+            isAuthenticated = !email.isNullOrEmpty(),
+            isLoading = false,
+            currentUserEmail = email,
+            currentUserName = user?.username,
+            targetYear = user?.targetYear,
+            createdAt = user?.createdAt,
+            avatarUrl = user?.avatarUrl ?: prefAvatar,
+            errorMessage = null
+        )
+    }
+
+    private val _uiState = MutableStateFlow(initialState)
     val uiState: StateFlow<AuthUiState> = _uiState
 
     init {

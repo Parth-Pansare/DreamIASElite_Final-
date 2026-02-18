@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dream IAS Elite · Notes</title>
+  <link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body data-page="notes">
+  <div class="ribbon">
+    <div class="container">
+      <span>Guest mode enabled — hook up real auth to sync progress.</span>
+      <div class="ribbon-actions">
+        <button>Log in</button>
+        <button class="ghost">Create account</button>
+      </div>
+    </div>
+  </div>
+
+  <header class="site-header">
+    <div class="container nav-bar">
+      <div class="brand">Dream IAS Elite</div>
+      <nav class="nav-links">
+        <a href="index.html" data-nav="home">Home</a>
+        <a href="dashboard.html" data-nav="dashboard">Dashboard</a>
+        <a href="tests.html" data-nav="tests">Tests</a>
+        <a href="pyq.html" data-nav="pyq">PYQ</a>
+        <a href="notes.html" data-nav="notes">Notes</a>
+        <a href="current-affairs.html" data-nav="current">Current Affairs</a>
+      </nav>
+      <div class="nav-actions">
+        <button class="btn btn-outline">Log in</button>
+        <button class="btn">Start now</button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <div class="container">
+      <section class="section-card">
+        <div class="section-title">Notes & Flashcards</div>
+        <h1 class="section-lead">Organize, tag, and revise quickly.</h1>
+        <p class="muted">Folder grid by subject, recent notes list, and flashcards for rapid revision.</p>
+      </section>
+
+      <div class="grid grid-3" id="notes-cards"></div>
+
+      <div class="grid grid-2">
+        <div class="section-card" id="notes-folders">
+          <div class="section-header">
+            <p class="section-title">Folders</p>
+            <a class="btn btn-outline" href="#notes-list">Recent</a>
+          </div>
+          <div class="tag-grid" id="folder-grid" style="margin-top:14px;"></div>
+        </div>
+
+        <div class="section-card" id="notes-list">
+          <div class="section-header">
+            <p class="section-title">Recent notes</p>
+            <a class="btn btn-outline" href="current-affairs.html#articles">Read CA</a>
+          </div>
+          <div class="card-stack" id="recent-notes" style="margin-top:14px;"></div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer class="footer">
+    <div class="container">
+      <div class="brand">Dream IAS Elite</div>
+      <div>UPSC companion for tests, notes, PYQs, and current affairs. Stay consistent. Stay ahead.</div>
+    </div>
+  </footer>
+
+  <script src="assets/js/data.js"></script>
+  <script src="assets/js/site.js"></script>
+  <script src="assets/js/notes.js"></script>
+</body>
+</html>

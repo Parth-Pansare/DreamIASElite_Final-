@@ -1,5 +1,6 @@
 package com.app.dreamiaselite.ui.screens.dashboard
 
+import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -12,7 +13,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ArrowBack
@@ -34,78 +34,34 @@ import androidx.navigation.NavHostController
 import com.app.dreamiaselite.ui.theme.AccentCyan
 import com.app.dreamiaselite.ui.theme.AccentLavender
 import com.app.dreamiaselite.ui.theme.AccentPeach
-import com.app.dreamiaselite.ui.theme.Gold
 
-data class SubjectCardItem(val title: String, val subtitle: String, val meta: String)
-data class TopicProgress(val title: String, val progress: String)
+data class SubjectCardItem(
+    val title: String,
+    val subtitle: String,
+    val meta: String,
+    val articleId: Int? = null
+)
 
 @Composable
 fun SubjectDashboardScreen(subject: String, navController: NavHostController) {
 
     val dailyMcqs = remember(subject) {
-        buildList {
-            add(SubjectCardItem("5 Quick MCQs", "Mixed difficulty", "Auto-filtered to $subject"))
-            add(SubjectCardItem("Timed drill • 8 Qs", "4 mins", "Great for warm-up"))
-            repeat(9) { idx ->
-                add(
-                    SubjectCardItem(
-                        "MCQ sprint ${idx + 1}",
-                        "${12 + idx} Q • mixed",
-                        "Focus: $subject practice"
-                    )
-                )
-            }
-        }
-    }
-
-    val topics = remember(subject) {
-        buildList {
-            add(TopicProgress("$subject Basics", "70%"))
-            add(TopicProgress("Important Acts", "40%"))
-            add(TopicProgress("Previous Year Themes", "55%"))
-            val topicNames = listOf(
-                "Schemes & Policies",
-                "Maps & Locations",
-                "Economic Concepts",
-                "Environment links",
-                "Science updates",
-                "Modern History",
-                "Culture & Art",
-                "Govt Programs",
-                "International Relations"
-            )
-            topicNames.forEachIndexed { idx, title ->
-                add(TopicProgress(title, "${45 + (idx * 5)}%"))
-            }
-        }
+        listOf(
+            SubjectCardItem("10 MCQ Warm-up", "Mixed difficulty", "Auto-filtered to $subject"),
+            SubjectCardItem("10 MCQ Timed Drill", "5 mins • speed focus", "Exactly 10 questions")
+        )
     }
 
     val caArticles = remember(subject) {
         buildList {
-            add(SubjectCardItem("Key $subject CA digest", "3 articles", "Updated today"))
-            add(SubjectCardItem("Exam-oriented briefs", "2 mins each", "Flag for revision"))
+            add(SubjectCardItem("Key $subject CA digest", "3 articles", "Updated today", articleId = 1))
+            add(SubjectCardItem("Exam-oriented briefs", "2 mins each", "Flag for revision", articleId = 2))
             repeat(9) { idx ->
                 add(
                     SubjectCardItem(
                         "$subject current note ${idx + 1}",
                         "Quick brief ${idx + 1}",
                         "New in the last week"
-                    )
-                )
-            }
-        }
-    }
-
-    val tests = remember(subject) {
-        buildList {
-            add(SubjectCardItem("$subject sectional test", "30 Q • Adaptive", "Prev best: 68%"))
-            add(SubjectCardItem("Mini drill", "10 Q • Timed", "Good for quick check"))
-            repeat(9) { idx ->
-                add(
-                    SubjectCardItem(
-                        "$subject practice set ${idx + 1}",
-                        "${18 + idx} Q • Mixed",
-                        "Sprint ${idx + 1}"
                     )
                 )
             }
@@ -122,22 +78,6 @@ fun SubjectDashboardScreen(subject: String, navController: NavHostController) {
                         "$subject note pack ${idx + 1}",
                         "Concise bullets",
                         "Ready to revise"
-                    )
-                )
-            }
-        }
-    }
-
-    val pyqs = remember(subject) {
-        buildList {
-            add(SubjectCardItem("$subject PYQ set", "10 Q • 2023-2021", "Avg accuracy 62%"))
-            add(SubjectCardItem("High-yield PYQs", "Curated mix", "Revise with notes"))
-            repeat(9) { idx ->
-                add(
-                    SubjectCardItem(
-                        "$subject PYQ drill ${idx + 1}",
-                        "8 Q • Mixed years",
-                        "Theme-wise practice"
                     )
                 )
             }
@@ -199,16 +139,12 @@ fun SubjectDashboardScreen(subject: String, navController: NavHostController) {
                 title = "Daily MCQs",
                 caption = "Short drills to stay sharp",
                 pillColor = AccentCyan,
-                items = dailyMcqs
-            )
-        }
-
-        item {
-            TopicListSection(
-                title = "Topics",
-                caption = "Focus areas for $subject",
-                pillColor = AccentPeach,
-                topics = topics
+                items = dailyMcqs,
+                onCardClick = { item ->
+                    val encodedTitle = Uri.encode("$subject - ${item.title}")
+                    val originRoute = Uri.encode("subject_dashboard/${Uri.encode(subject)}")
+                    navController.navigate("test_session/$encodedTitle?origin=$originRoute&originType=subject&originSubject=${Uri.encode(subject)}")
+                }
             )
         }
 
@@ -217,16 +153,12 @@ fun SubjectDashboardScreen(subject: String, navController: NavHostController) {
                 title = "Important CA articles",
                 caption = "$subject-linked current affairs",
                 pillColor = AccentLavender,
-                items = caArticles
-            )
-        }
-
-        item {
-            SubjectSection(
-                title = "Tests in $subject",
-                caption = "Sectionals and drills",
-                pillColor = Gold,
-                items = tests
+                items = caArticles,
+                onCardClick = { item ->
+                    item.articleId?.let { id ->
+                        navController.navigate("current_affair_detail/$id")
+                    }
+                }
             )
         }
 
@@ -235,16 +167,19 @@ fun SubjectDashboardScreen(subject: String, navController: NavHostController) {
                 title = "Notes",
                 caption = "Your saved material",
                 pillColor = AccentPeach,
-                items = notes
-            )
-        }
-
-        item {
-            SubjectSection(
-                title = "PYQs",
-                caption = "Filtered for $subject",
-                pillColor = AccentCyan,
-                items = pyqs
+                items = notes,
+                onCardClick = { item ->
+                    when {
+                        item.title.startsWith("Last opened note", ignoreCase = true) -> {
+                            val encoded = Uri.encode(subject)
+                            navController.navigate("notes_last_opened/$encoded")
+                        }
+                        item.title.startsWith("Flashcards", ignoreCase = true) -> {
+                            val encoded = Uri.encode(subject)
+                            navController.navigate("notes_flashcards/$encoded")
+                        }
+                    }
+                }
             )
         }
 
@@ -257,100 +192,44 @@ private fun SubjectSection(
     title: String,
     caption: String,
     pillColor: Color,
-    items: List<SubjectCardItem>
+    items: List<SubjectCardItem>,
+    onCardClick: ((SubjectCardItem) -> Unit)? = null
 ) {
-    val loadState = rememberLoadMoreState(
-        totalItems = items.size,
-        initialVisible = 2
-    )
-    val visibleItems = items.take(loadState.visibleCount)
+    val visibleItems = items
 
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         SectionHeader(
             title = title,
             caption = caption,
             pillColor = pillColor,
-            viewButtonLabel = loadState.buttonLabel,
-            onViewAction = loadState.onClick
+            viewButtonLabel = null,
+            onViewAction = {}
         )
 
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            visibleItems.forEach { item ->
-                SubjectCard(item, pillColor)
+            visibleItems.take(2).forEach { item ->
+                SubjectCard(
+                    item = item,
+                    highlightColor = pillColor,
+                    onClick = onCardClick?.let { handler -> { handler(item) } }
+                )
             }
         }
     }
 }
 
 @Composable
-private fun TopicListSection(
-    title: String,
-    caption: String,
-    pillColor: Color,
-    topics: List<TopicProgress>
+private fun SubjectCard(
+    item: SubjectCardItem,
+    highlightColor: Color,
+    onClick: (() -> Unit)? = null
 ) {
-    val loadState = rememberLoadMoreState(
-        totalItems = topics.size,
-        initialVisible = 3
-    )
-    val visibleTopics = topics.take(loadState.visibleCount)
-
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        SectionHeader(
-            title = title,
-            caption = caption,
-            pillColor = pillColor,
-            viewButtonLabel = loadState.buttonLabel,
-            onViewAction = loadState.onClick
-        )
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            visibleTopics.forEach { topic ->
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(14.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(14.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column {
-                            Text(
-                                text = topic.title,
-                                style = MaterialTheme.typography.bodyLarge.copy(
-                                    fontWeight = FontWeight.Medium,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                            )
-                            Text(
-                                text = "Progress ${topic.progress}",
-                                style = MaterialTheme.typography.bodyMedium.copy(
-                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                                )
-                            )
-                        }
-                        Text(
-                            text = topic.progress,
-                            style = MaterialTheme.typography.titleMedium.copy(
-                                fontWeight = FontWeight.Bold,
-                                color = pillColor
-                            )
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun SubjectCard(item: SubjectCardItem, highlightColor: Color) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(
+                if (onClick != null) Modifier.clickable { onClick() } else Modifier
+            ),
         shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)

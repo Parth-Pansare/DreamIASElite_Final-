@@ -1,0 +1,109 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Subject {
+  HISTORY
+  POLITY
+  GEOGRAPHY
+  ECONOMY
+  ENVIRONMENT
+  SCIENCE_TECH
+}
+
+model User {
+  id         String        @id @default(cuid())
+  email      String        @unique
+  name       String?
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+  notes      Note[]
+  sessions   TestSession[]
+  flashcards Flashcard[]
+}
+
+model Test {
+  id            String        @id @default(cuid())
+  title         String
+  subject       Subject?
+  durationMins  Int           @default(10)
+  questionCount Int           @default(10)
+  createdAt     DateTime      @default(now())
+  questions     Question[]
+  sessions      TestSession[]
+}
+
+model Question {
+  id           String   @id @default(cuid())
+  prompt       String
+  options      String[]
+  correctIndex Int
+  explanation  String?
+  test         Test?    @relation(fields: [testId], references: [id], onDelete: Cascade)
+  testId       String?
+}
+
+model TestSession {
+  id               String   @id @default(cuid())
+  score            Int?
+  timeTakenSeconds Int?
+  createdAt        DateTime @default(now())
+  user             User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  userId           String?
+  test             Test?    @relation(fields: [testId], references: [id], onDelete: Cascade)
+  testId           String?
+}
+
+model Note {
+  id        String   @id @default(cuid())
+  title     String
+  content   String
+  subject   Subject?
+  tags      String[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  userId    String?
+}
+
+model Flashcard {
+  id        String   @id @default(cuid())
+  front     String
+  back      String
+  subject   Subject?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  userId    String?
+}
+
+model Article {
+  id          String   @id @default(cuid())
+  title       String
+  summary     String
+  category    String
+  importance  String?
+  publishedAt DateTime @default(now())
+}
+
+model PyqPaper {
+  id        String        @id @default(cuid())
+  year      Int
+  title     String
+  subject   Subject?
+  createdAt DateTime      @default(now())
+  questions PyqQuestion[]
+}
+
+model PyqQuestion {
+  id          String   @id @default(cuid())
+  prompt      String
+  answer      String
+  explanation String?
+  paper       PyqPaper @relation(fields: [paperId], references: [id], onDelete: Cascade)
+  paperId     String
+}

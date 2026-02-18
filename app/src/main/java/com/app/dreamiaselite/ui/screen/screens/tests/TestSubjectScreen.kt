@@ -1,6 +1,7 @@
 package com.app.dreamiaselite.ui.screen.screens.tests
 
 import android.net.Uri
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -20,16 +21,14 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Assignment
 import androidx.compose.material.icons.outlined.CheckCircle
-import androidx.compose.material.icons.outlined.Star
-import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material.icons.outlined.Timer
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Divider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -53,7 +52,6 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import java.io.Serializable
 import kotlinx.coroutines.delay
-import android.widget.Toast
 import androidx.compose.foundation.layout.Spacer
 
 data class TestQuestion(
@@ -75,18 +73,46 @@ data class TestResultData(
 // ----------------- Test Session Screen -----------------
 
 @Composable
-fun TestSessionScreen(subjectName: String, navController: NavController) {
+fun TestSessionScreen(
+    subjectName: String,
+    navController: NavController,
+    originRoute: String? = null,
+    originType: String? = null,
+    originSubject: String? = null,
+    originBook: String? = null
+) {
     val questions = remember { generateQuestionsFor(subjectName) }
     val totalTimeSeconds = 10 * 60
     var timeLeft by rememberSaveable { mutableStateOf(totalTimeSeconds) }
     var currentIndex by rememberSaveable { mutableStateOf(0) }
     var selected by rememberSaveable { mutableStateOf(List(questions.size) { null as Int? }) }
-    var bookmarks by rememberSaveable { mutableStateOf(List(questions.size) { false }) }
     var completed by rememberSaveable { mutableStateOf(false) }
-    val context = LocalContext.current
+    var showSubmitConfirm by rememberSaveable { mutableStateOf(false) }
     val displayTitle = subjectName.substringAfterLast(" - ", subjectName)
-    val isBookmarked = bookmarks.getOrElse(currentIndex) { false }
     val questionScroll = rememberScrollState()
+
+    if (questions.isEmpty()) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = "No questions available for this test.",
+                style = MaterialTheme.typography.bodyLarge.copy(
+                    color = MaterialTheme.colorScheme.onSurface
+                ),
+                textAlign = TextAlign.Center
+            )
+            Spacer(Modifier.height(12.dp))
+            Button(onClick = { navController.popBackStack() }) {
+                Text("Back")
+            }
+        }
+        return
+    }
 
     LaunchedEffect(currentIndex) {
         questionScroll.scrollTo(0)
@@ -97,7 +123,17 @@ fun TestSessionScreen(subjectName: String, navController: NavController) {
             delay(1000)
             timeLeft--
             if (timeLeft == 0) {
-                submitTest(subjectName, questions, selected, totalTimeSeconds - timeLeft, navController)
+                submitTest(
+                    subjectName,
+                    questions,
+                    selected,
+                    totalTimeSeconds - timeLeft,
+                    navController,
+                    originRoute,
+                    originType,
+                    originSubject,
+                    originBook
+                )
                 completed = true
             }
         }
@@ -132,28 +168,7 @@ fun TestSessionScreen(subjectName: String, navController: NavController) {
                     style = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f))
                 )
             }
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                IconButton(
-                    onClick = {
-                        bookmarks = bookmarks.toMutableList().also { it[currentIndex] = !isBookmarked }
-                        Toast.makeText(
-                            context,
-                            if (!isBookmarked) "Bookmarked this question" else "Bookmark removed",
-                            Toast.LENGTH_SHORT
-                        ).show()
-                    }
-                ) {
-                    Icon(
-                        imageVector = if (isBookmarked) Icons.Outlined.Star else Icons.Outlined.StarBorder,
-                        contentDescription = "Bookmark question",
-                        tint = if (isBookmarked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-                    )
-                }
-                TimerPill(timeLeft)
-            }
+            TimerPill(timeLeft)
         }
 
         Box(
@@ -171,7 +186,9 @@ fun TestSessionScreen(subjectName: String, navController: NavController) {
                     question = questions[currentIndex],
                     selectedIndex = selected[currentIndex],
                     onSelect = { chosen ->
-                        selected = selected.toMutableList().also { it[currentIndex] = chosen }
+                        selected = selected.toMutableList().also {
+                            it[currentIndex] = if (it[currentIndex] == chosen) null else chosen
+                        }
                     }
                 )
                 Spacer(modifier = Modifier.height(12.dp))
@@ -200,8 +217,7 @@ fun TestSessionScreen(subjectName: String, navController: NavController) {
                     if (currentIndex < questions.lastIndex) {
                         currentIndex++
                     } else {
-                        submitTest(subjectName, questions, selected, totalTimeSeconds - timeLeft, navController)
-                        completed = true
+                        showSubmitConfirm = true
                     }
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
@@ -211,6 +227,49 @@ fun TestSessionScreen(subjectName: String, navController: NavController) {
                     color = MaterialTheme.colorScheme.onPrimary
                 )
             }
+        }
+
+        if (showSubmitConfirm) {
+            val answered = selected.count { it != null }
+            AlertDialog(
+                onDismissRequest = { showSubmitConfirm = false },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            showSubmitConfirm = false
+                            completed = true
+                            submitTest(
+                                subjectName,
+                                questions,
+                                selected,
+                                totalTimeSeconds - timeLeft,
+                                navController,
+                                originRoute,
+                                originType,
+                                originSubject,
+                                originBook
+                            )
+                        }
+                    ) {
+                        Text("Submit now")
+                    }
+                },
+                dismissButton = {
+                    Button(
+                        onClick = { showSubmitConfirm = false },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.surface
+                        )
+                    ) { Text("Continue test", color = MaterialTheme.colorScheme.onSurface) }
+                },
+                title = { Text("Submit test?") },
+                text = {
+                    Text(
+                        "Answered $answered of ${questions.size}. Submit now?",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+            )
         }
     }
 }
@@ -242,29 +301,29 @@ private fun QuestionCard(
     selectedIndex: Int?,
     onSelect: (Int) -> Unit
 ) {
-    Card(
+    Column(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(2.dp)
+        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Text(
-                text = question.question,
-                style = MaterialTheme.typography.titleMedium.copy(
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-            )
+        Text(
+            text = question.question,
+            style = MaterialTheme.typography.titleMedium.copy(
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface
+            ),
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
 
-            question.options.forEachIndexed { index, option ->
-                AnswerOption(
-                    text = option,
-                    selected = selectedIndex == index,
-                    onClick = { onSelect(index) }
+        question.options.forEachIndexed { index, option ->
+            AnswerOption(
+                text = option,
+                selected = selectedIndex == index,
+                onClick = { onSelect(index) }
+            )
+            if (index < question.options.lastIndex) {
+                Divider(
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f),
+                    thickness = 0.5.dp
                 )
             }
         }
@@ -277,30 +336,32 @@ private fun AnswerOption(
     selected: Boolean,
     onClick: () -> Unit
 ) {
-    val borderColor = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
-    val backgroundColor = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surface
+    val backgroundColor = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.08f) else Color.Transparent
+    val textColor = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
             .background(backgroundColor)
-            .border(1.dp, borderColor, RoundedCornerShape(12.dp))
-            .padding(horizontal = 12.dp, vertical = 10.dp)
-            .clickable { onClick() },
+            .clickable { onClick() }
+            .padding(horizontal = 4.dp, vertical = 14.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
             text = text,
-            style = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface)
+            style = MaterialTheme.typography.bodyLarge.copy(
+                color = textColor,
+                fontWeight = if (selected) FontWeight.Medium else FontWeight.Normal
+            ),
+            modifier = Modifier.weight(1f)
         )
         if (selected) {
             Icon(
                 imageVector = Icons.Outlined.CheckCircle,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(18.dp)
+                modifier = Modifier.size(20.dp)
             )
         }
     }
@@ -311,7 +372,11 @@ private fun submitTest(
     questions: List<TestQuestion>,
     selected: List<Int?>,
     timeTaken: Int,
-    navController: NavController
+    navController: NavController,
+    originRoute: String?,
+    originType: String? = null,
+    originSubject: String? = null,
+    originBook: String? = null
 ) {
     val result = TestResultData(
         subject = subject,
@@ -320,6 +385,10 @@ private fun submitTest(
         timeTakenSeconds = timeTaken
     )
     navController.currentBackStackEntry?.savedStateHandle?.set("test_result", result)
+    navController.currentBackStackEntry?.savedStateHandle?.set("test_origin_route", originRoute)
+    navController.currentBackStackEntry?.savedStateHandle?.set("test_origin_type", originType)
+    navController.currentBackStackEntry?.savedStateHandle?.set("test_origin_subject", originSubject)
+    navController.currentBackStackEntry?.savedStateHandle?.set("test_origin_book", originBook)
     navController.navigate("test_result")
 }
 
@@ -793,6 +862,26 @@ private fun generalQuestions() = listOf(
 @Composable
 fun TestResultScreen(navController: NavController) {
     val result = navController.previousBackStackEntry?.savedStateHandle?.get<TestResultData>("test_result")
+    val originRoute = navController.previousBackStackEntry?.savedStateHandle?.get<String>("test_origin_route")
+    val originType = navController.previousBackStackEntry?.savedStateHandle?.get<String>("test_origin_type")
+    val originSubject = navController.previousBackStackEntry?.savedStateHandle?.get<String>("test_origin_subject")
+    val originBook = navController.previousBackStackEntry?.savedStateHandle?.get<String>("test_origin_book")
+
+    val backToTarget: () -> Unit = {
+        val targetRoute = when (originType) {
+            "units" -> if (originSubject != null && originBook != null) "test_units/$originSubject/$originBook" else null
+            "books" -> originSubject?.let { "test_books/$it" }
+            "subject" -> originSubject?.let { "subject_dashboard/$it" }
+            else -> originRoute ?: "tests"
+        } ?: "tests"
+        val popped = navController.popBackStack(targetRoute, inclusive = false)
+        if (!popped) {
+            navController.popBackStack() // remove result screen
+            navController.navigate(targetRoute) { launchSingleTop = true }
+        }
+    }
+
+    BackHandler { backToTarget() }
 
     if (result == null) {
         Column(
@@ -843,49 +932,47 @@ fun TestResultScreen(navController: NavController) {
         )
 
         result.questions.forEachIndexed { index, q ->
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(14.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                elevation = CardDefaults.cardElevation(1.dp)
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Column(
-                    modifier = Modifier.padding(14.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Text(
-                        text = "Q${index + 1}. ${q.question}",
-                        style = MaterialTheme.typography.titleSmall.copy(
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
+                Text(
+                    text = "Q${index + 1}. ${q.question}",
+                    style = MaterialTheme.typography.titleSmall.copy(
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface
                     )
+                )
 
-                    val userAnswer = result.selected.getOrNull(index)
-                    val isCorrect = userAnswer == q.correctIndex
-                    Text(
-                        text = "Your answer: ${userAnswer?.let { q.options[it] } ?: "Not answered"}",
-                        style = MaterialTheme.typography.bodyMedium.copy(
-                            color = if (isCorrect) Color(0xFF15803D) else Color(0xFFB91C1C),
-                            fontWeight = FontWeight.Medium
-                        )
+                val userAnswer = result.selected.getOrNull(index)
+                val isCorrect = userAnswer == q.correctIndex
+                Text(
+                    text = "Your answer: ${userAnswer?.let { q.options[it] } ?: "Not answered"}",
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        color = if (isCorrect) Color(0xFF15803D) else Color(0xFFB91C1C),
+                        fontWeight = FontWeight.Medium
                     )
-                    Text(
-                        text = "Correct answer: ${q.options[q.correctIndex]}",
-                        style = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface)
-                    )
-                    Text(
-                        text = "Explanation: ${q.explanation}",
-                        style = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)),
-                        textAlign = TextAlign.Start
-                    )
-                }
+                )
+                Text(
+                    text = "Correct answer: ${q.options[q.correctIndex]}",
+                    style = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface)
+                )
+                Text(
+                    text = "Explanation: ${q.explanation}",
+                    style = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)),
+                    textAlign = TextAlign.Start
+                )
+            }
+            if (index < result.questions.lastIndex) {
+                Divider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f))
             }
         }
 
         Button(
             modifier = Modifier.fillMaxWidth(),
-            onClick = { navController.popBackStack("tests", inclusive = false) },
+            onClick = { backToTarget() },
             colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
         ) {
             Text("Back to Tests", color = MaterialTheme.colorScheme.onPrimary)
@@ -921,73 +1008,67 @@ fun TestSubjectScreen(subjectName: String, navController: NavController) {
             style = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f))
         )
 
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            elevation = CardDefaults.cardElevation(2.dp)
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Quick Subject Test",
-                        style = MaterialTheme.typography.titleMedium.copy(
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                    )
-                    Surface(
-                        shape = CircleShape,
-                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.Assignment,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.padding(8.dp)
-                        )
-                    }
-                }
-
                 Text(
-                    text = "10 MCQs • 10 minutes • Auto-evaluated with explanations",
-                    style = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f))
+                    text = "Quick Subject Test",
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
                 )
-
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                Surface(
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
                 ) {
                     Icon(
-                        imageVector = Icons.Outlined.Timer,
+                        imageVector = Icons.Outlined.Assignment,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                    Text(
-                        text = "Timer starts when you begin",
-                        style = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f))
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(8.dp)
                     )
                 }
+            }
 
-                Button(
-                    modifier = Modifier.fillMaxWidth(),
-                    onClick = {
-                        val encoded = Uri.encode(subjectName)
-                        navController.navigate("test_session/$encoded")
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
-                ) {
-                    Text("Start Test", color = MaterialTheme.colorScheme.onPrimary)
-                }
+            Text(
+                text = "10 MCQs • 10 minutes • Auto-evaluated with explanations",
+                style = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f))
+            )
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Timer,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary
+                )
+                Text(
+                    text = "Timer starts when you begin",
+                    style = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f))
+                )
+            }
+
+            Button(
+                modifier = Modifier.fillMaxWidth(),
+                onClick = {
+                    val encoded = Uri.encode(subjectName)
+                    val origin = Uri.encode("tests")
+                    navController.navigate("test_session/$encoded?origin=$origin")
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+            ) {
+                Text("Start Test", color = MaterialTheme.colorScheme.onPrimary)
             }
         }
 

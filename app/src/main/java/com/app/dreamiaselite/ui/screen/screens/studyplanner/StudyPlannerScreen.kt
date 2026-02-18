@@ -2,7 +2,6 @@ package com.app.dreamiaselite.ui.screen.screens.studyplanner
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -10,10 +9,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 //import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
@@ -27,7 +24,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -35,7 +31,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -86,7 +81,7 @@ fun StudyPlannerScreen() {
             )
         )
         Text(
-            text = "Plan your day and track your weekly targets.",
+            text = "Plan your day and track your progress.",
             style = MaterialTheme.typography.bodyLarge.copy(
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
             )
@@ -112,8 +107,6 @@ fun StudyPlannerScreen() {
                 }
             }
         )
-
-        WeeklyTargetsCard()
 
         Spacer(Modifier.height(4.dp))
 
@@ -492,91 +485,5 @@ private fun PlannerTaskRow(
                 )
             }
         }
-    }
-}
-
-// ---------- weekly targets ----------
-
-@Composable
-private fun WeeklyTargetsCard() {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Text(
-                text = "Weekly targets",
-                style = MaterialTheme.typography.titleMedium.copy(
-                    fontWeight = FontWeight.SemiBold
-                )
-            )
-            Text(
-                text = "Keep at least 70% of your weekly plan consistent.",
-                style = MaterialTheme.typography.bodyLarge.copy(
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                )
-            )
-
-            Spacer(Modifier.height(8.dp))
-
-            val days = listOf("M", "T", "W", "T", "F", "S", "S")
-            val completion = listOf(0.3f, 0.7f, 0.4f, 0.8f, 0.6f, 0.2f, 0.0f)
-
-            Row(
-                horizontalArrangement = Arrangement.SpaceBetween,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                days.forEachIndexed { index, day ->
-                    DayCompletionCircle(
-                        label = day,
-                        progress = completion[index]
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun DayCompletionCircle(
-    label: String,
-    progress: Float
-) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Box(
-            modifier = Modifier
-                .size(32.dp)
-                .clip(CircleShape)
-                .background(
-                    Brush.verticalGradient(
-                        listOf(
-                            MaterialTheme.colorScheme.primary.copy(alpha = 0.25f),
-                            MaterialTheme.colorScheme.surface
-                        )
-                    )
-                ),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = label,
-                style = MaterialTheme.typography.bodyLarge.copy(
-                    fontWeight = FontWeight.Medium
-                )
-            )
-        }
-        Spacer(Modifier.height(4.dp))
-        Text(
-            text = "${(progress * 100).toInt()}%",
-            style = MaterialTheme.typography.bodyLarge.copy(
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-            )
-        )
     }
 }

@@ -2,6 +2,7 @@ package com.app.dreamiaselite.ui.screen.screens.profile
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Build
@@ -39,8 +40,11 @@ import com.canhub.cropper.CropImageOptions
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.ByteArrayOutputStream
+import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
+import kotlin.math.max
 
 @Composable
 fun ProfileScreen(
@@ -135,9 +139,17 @@ fun ProfileScreen(
         ConfirmCropDialog(
             croppedImageUri = croppedImageUri,
             onConfirm = { uri ->
-                selectedPhotoUriString = uri?.toString()
-                val targetForSave = targetYear?.toString() ?: ""
-                onUpdateProfile(displayName, targetForSave, uri)
+                if (uri == null) {
+                    showConfirmDialog = false
+                    return@ConfirmCropDialog
+                }
+                scope.launch {
+                    val compressed = compressImageToUnder200Kb(context, uri, 200 * 1024)
+                    val finalUri = compressed ?: uri
+                    selectedPhotoUriString = finalUri.toString()
+                    val targetForSave = targetYear?.toString() ?: ""
+                    onUpdateProfile(displayName, targetForSave, finalUri)
+                }
                 showConfirmDialog = false
             },
             onDismiss = { showConfirmDialog = false }
@@ -504,4 +516,47 @@ private fun rememberBitmapFromUri(uri: Uri?): androidx.compose.runtime.State<Ima
             }.getOrNull()
         }
     }
+}
+
+private suspend fun compressImageToUnder200Kb(
+    context: android.content.Context,
+    uri: Uri,
+    maxBytes: Int,
+    maxDimension: Int = 1280
+): Uri? = withContext(Dispatchers.IO) {
+    runCatching {
+        val resolver = context.contentResolver
+
+        fun openStream() = resolver.openInputStream(uri)
+
+        // Step 1: bounds
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        openStream()?.use { BitmapFactory.decodeStream(it, null, bounds) }
+
+        var sample = 1
+        val maxSide = max(bounds.outWidth, bounds.outHeight)
+        while (maxSide / sample > maxDimension) sample *= 2
+
+        // Step 2: decode with sample
+        val decodeOpts = BitmapFactory.Options().apply {
+            inSampleSize = sample
+            inPreferredConfig = Bitmap.Config.RGB_565
+        }
+        val bitmap = openStream()?.use { BitmapFactory.decodeStream(it, null, decodeOpts) } ?: return@runCatching null
+
+        // Step 3: compress loop
+        var quality = 90
+        var bytes: ByteArray
+        do {
+            val baos = ByteArrayOutputStream()
+            bitmap.compress(Bitmap.CompressFormat.JPEG, quality, baos)
+            bytes = baos.toByteArray()
+            quality -= 5
+        } while (bytes.size > maxBytes && quality >= 50)
+
+        // Step 4: save to cache file
+        val outFile = File(context.cacheDir, "avatar_${System.currentTimeMillis()}.jpg")
+        outFile.outputStream().use { it.write(bytes) }
+        Uri.fromFile(outFile)
+    }.getOrNull()
 }

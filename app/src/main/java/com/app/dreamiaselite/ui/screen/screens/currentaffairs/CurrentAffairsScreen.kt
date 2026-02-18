@@ -48,6 +48,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.navigation.NavHostController
+import com.app.dreamiaselite.ui.screens.currentaffairs.CurrentAffairsData.getById
+import com.app.dreamiaselite.ui.screens.currentaffairs.CurrentAffairsData.articles
 
 // ---------------- DATA MODELS ----------------
 
@@ -65,7 +68,7 @@ data class CurrentAffairArticle(
 // ---------------- MAIN SCREEN ----------------
 
 @Composable
-fun CurrentAffairsScreen() {
+fun CurrentAffairsScreen(navController: NavHostController) {
     val listState = rememberLazyListState()
 
     // UPSC-relevant chips
@@ -88,50 +91,7 @@ fun CurrentAffairsScreen() {
     )
 
     // Fake article data for now
-    val allArticles = remember {
-        listOf(
-            CurrentAffairArticle(
-                id = 1,
-                category = "International",
-                importance = "High",
-                title = "G20 Summit 2024: Key Outcomes and India's Role",
-                summary = "Major announcements on climate change, global economic cooperation and India's growing diplomatic influence.",
-                date = "Nov 20",
-                readTime = "8 min read",
-                tag = "International"
-            ),
-            CurrentAffairArticle(
-                id = 2,
-                category = "Economy",
-                importance = "High",
-                title = "New Economic Survey Released: GDP Growth Projections",
-                summary = "The latest Economic Survey projects India's GDP growth at 6.5% for the upcoming fiscal year with focus on infrastructure and manufacturing.",
-                date = "Nov 19",
-                readTime = "12 min read",
-                tag = "Economy"
-            ),
-            CurrentAffairArticle(
-                id = 3,
-                category = "Polity & Governance",
-                importance = "Moderate",
-                title = "Key Amendments Proposed to the RTI Act",
-                summary = "The proposed amendments aim to modify the tenure and service conditions of Information Commissioners.",
-                date = "Nov 18",
-                readTime = "6 min read",
-                tag = "Polity & Governance"
-            ),
-            CurrentAffairArticle(
-                id = 4,
-                category = "Environment & Ecology",
-                importance = "High",
-                title = "New Wetland Conservation Rules Notified",
-                summary = "The government has notified updated rules for identification and conservation of wetlands across the country.",
-                date = "Nov 18",
-                readTime = "7 min read",
-                tag = "Environment & Ecology"
-            )
-        )
-    }
+    val allArticles = remember { articles }
 
     var searchQuery by remember { mutableStateOf("") }
     var selectedChip by remember { mutableStateOf("All") }
@@ -195,6 +155,9 @@ fun CurrentAffairsScreen() {
                         } else {
                             bookmarkedIds + article.id
                         }
+                    },
+                    onReadMore = {
+                        navController.navigate("current_affair_detail/${article.id}")
                     }
                 )
             }
@@ -342,7 +305,8 @@ private fun WeeklyHighlightCard() {
 private fun CurrentAffairArticleCard(
     article: CurrentAffairArticle,
     isBookmarked: Boolean,
-    onBookmarkClick: () -> Unit
+    onBookmarkClick: () -> Unit,
+    onReadMore: () -> Unit
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -450,7 +414,7 @@ private fun CurrentAffairArticleCard(
             Spacer(Modifier.height(4.dp))
 
             Button(
-                onClick = { /* TODO: open detail screen or webview */ },
+                onClick = onReadMore,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(40.dp),
@@ -462,6 +426,139 @@ private fun CurrentAffairArticleCard(
             ) {
                 Text(
                     text = "Read Full Article",
+                    style = MaterialTheme.typography.bodyLarge.copy(
+                        fontWeight = FontWeight.SemiBold
+                    )
+                )
+            }
+        }
+    }
+}
+
+// ---------------- DETAIL SCREEN ----------------
+
+@Composable
+fun CurrentAffairDetailScreen(
+    articleId: Int,
+    navController: NavHostController
+) {
+    val article = remember(articleId) { getById(articleId) }
+
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        item {
+            Text(
+                text = "Current Affairs",
+                style = MaterialTheme.typography.labelLarge.copy(
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                )
+            )
+            Spacer(Modifier.height(6.dp))
+            Text(
+                text = article?.title ?: "Article not found",
+                style = MaterialTheme.typography.headlineSmall.copy(
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            )
+
+            Spacer(Modifier.height(8.dp))
+
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                article?.let {
+                    BadgeChip(
+                        text = it.category,
+                        background = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
+                        foreground = MaterialTheme.colorScheme.primary
+                    )
+                    BadgeChip(
+                        text = it.importance,
+                        background = Color(0xFFFFF0F0),
+                        foreground = Color(0xFFE53935)
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(10.dp))
+
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = article?.date ?: "",
+                    style = MaterialTheme.typography.bodyLarge.copy(
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.65f)
+                    )
+                )
+                Text(
+                    text = "•",
+                    style = MaterialTheme.typography.bodyLarge.copy(
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.65f)
+                    )
+                )
+                Text(
+                    text = article?.readTime ?: "",
+                    style = MaterialTheme.typography.bodyLarge.copy(
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.65f)
+                    )
+                )
+            }
+
+            Spacer(Modifier.height(14.dp))
+
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text(
+                        text = article?.summary
+                            ?: "We couldn’t load this article. Please try again from the Current Affairs list.",
+                        style = MaterialTheme.typography.bodyLarge.copy(
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    )
+
+                    Text(
+                        text = "More in-depth notes and references will appear here soon. Use the bookmark to save this for revision.",
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.75f)
+                        )
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(12.dp))
+
+            Button(
+                onClick = { navController.popBackStack() },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(44.dp),
+                shape = RoundedCornerShape(50),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
+                )
+            ) {
+                Text(
+                    text = "Back",
                     style = MaterialTheme.typography.bodyLarge.copy(
                         fontWeight = FontWeight.SemiBold
                     )

@@ -1,9 +1,5 @@
 package com.app.dreamiaselite.ui.screen.screens.help
 
-import android.content.ActivityNotFoundException
-import android.content.Intent
-import android.net.Uri
-import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -12,125 +8,43 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.app.dreamiaselite.ui.theme.Gold
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 
 @Composable
 fun HelpFeedbackScreen(
     currentUserEmail: String?
 ) {
-    var message by remember { mutableStateOf("") }
-    val context = LocalContext.current
+    val scrollState = rememberScrollState()
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
+            .verticalScroll(scrollState)
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Text(
-            text = "Help & Feedback",
+            text = "Help",
             style = MaterialTheme.typography.headlineSmall.copy(
                 fontWeight = FontWeight.Bold
             )
         )
         Text(
-            text = "Facing an issue or have a feature idea? Tell us and we’ll try to make it happen.",
+            text = "Get quick answers to common questions and helpful tips to make the most of your study sessions.",
             style = MaterialTheme.typography.bodyLarge.copy(
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
             )
         )
-
-        Card(
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(
-                modifier = Modifier.padding(14.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Text(
-                    text = "Contact us",
-                    style = MaterialTheme.typography.titleMedium.copy(
-                        fontWeight = FontWeight.SemiBold
-                    )
-                )
-
-                OutlinedTextField(
-                    value = currentUserEmail.orEmpty(),
-                    onValueChange = { },
-                    readOnly = true,
-                    label = { Text("Your email") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
-                )
-
-                OutlinedTextField(
-                    value = message,
-                    onValueChange = { message = it },
-                    label = { Text("Describe your issue or feedback") },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(140.dp)
-                )
-
-                Spacer(Modifier.height(8.dp))
-
-                Button(
-                    onClick = {
-                        if (message.isBlank()) {
-                            Toast.makeText(context, "Please write your feedback first", Toast.LENGTH_SHORT).show()
-                        } else {
-                            val intent = Intent(Intent.ACTION_SENDTO).apply {
-                                data = Uri.parse("mailto:")
-                                putExtra(Intent.EXTRA_EMAIL, arrayOf("parthpansare310306@gmail.com"))
-                                putExtra(Intent.EXTRA_SUBJECT, "Dream IAS Elite - Feedback")
-                                putExtra(
-                                    Intent.EXTRA_TEXT,
-                                    """
-                                        Feedback:
-                                        $message
-
-                                        From: ${currentUserEmail ?: "Unknown user"}
-                                    """.trimIndent()
-                                )
-                            }
-                            try {
-                                context.startActivity(Intent.createChooser(intent, "Send feedback"))
-                            } catch (_: ActivityNotFoundException) {
-                                Toast.makeText(context, "No email app found to send feedback", Toast.LENGTH_SHORT).show()
-                            }
-                        }
-                    },
-                    modifier = Modifier.align(androidx.compose.ui.Alignment.End),
-                    shape = RoundedCornerShape(50),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Gold,
-                        contentColor = MaterialTheme.colorScheme.onPrimary
-                    )
-                ) {
-                    Text("Submit")
-                }
-            }
-        }
 
         Card(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -159,10 +73,67 @@ fun HelpFeedbackScreen(
         }
 
         Text(
-            text = "Response time: typically within 24–48 hours (future feature).",
-            style = MaterialTheme.typography.bodyLarge.copy(
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-            )
+            text = "Frequently Asked Questions",
+            style = MaterialTheme.typography.titleLarge.copy(
+                fontWeight = FontWeight.Bold
+            ),
+            modifier = Modifier.padding(top = 8.dp)
         )
+
+        FaqItem(
+            question = "How can I access tests?",
+            answer = "Navigate to the 'Tests' tab from the bottom navigation bar to find subject-wise reference books and full-length tests."
+        )
+
+        FaqItem(
+            question = "How do I set study goals?",
+            answer = "Open the drawer and select 'Study Planner'. Here you can add daily tasks and mark them as done as you progress."
+        )
+
+        FaqItem(
+            question = "Where can I find Previous Year Questions?",
+            answer = "Go to the 'PYQ' tab in the bottom bar. You can explore papers year-wise or subject-wise with detailed explanations."
+        )
+
+        FaqItem(
+            question = "Can I change the app theme?",
+            answer = "Yes! In the navigation drawer, select 'Theme & Appearance' to switch between light and dark modes and choose your favorite accent color."
+        )
+
+        FaqItem(
+            question = "How do I update my profile?",
+            answer = "Open the drawer and tap on 'My Profile'. You can edit your name, target year, and update your profile photo there."
+        )
+
+        Spacer(Modifier.height(24.dp))
     }
 }
+
+@Composable
+private fun FaqItem(question: String, answer: String) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Text(
+                text = question,
+                style = MaterialTheme.typography.titleMedium.copy(
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            )
+            Text(
+                text = answer,
+                style = MaterialTheme.typography.bodyLarge.copy(
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
+                )
+            )
+        }
+    }
+}
+

@@ -22,6 +22,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.interaction.MutableInteractionSource
+//import androidx.compose.material.ripple.ripple
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.outlined.AccountBalance
@@ -47,10 +49,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.navigation.NavController
 import android.net.Uri
+import android.content.Intent
+import android.widget.Toast
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.Alignment
@@ -65,7 +70,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AssistChipDefaults
+import androidx.compose.material3.ripple
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import kotlinx.coroutines.delay
 // ---------- data models ----------
 
@@ -86,6 +96,49 @@ data class NoteItem(
     val tags: List<String>
 )
 
+data class Flashcard(
+    val id: Int,
+    val subject: String,
+    val front: String,
+    val back: String
+)
+
+private fun buildFlashcardsForSubject(subject: String): List<Flashcard> {
+    val title = subject.ifBlank { "Subject" }
+    return listOf(
+        Flashcard(
+            id = 1,
+            subject = subject,
+            front = "$title: Key Concept",
+            back = "Quick recall points for $title. Add more when backend is wired."
+        ),
+        Flashcard(
+            id = 2,
+            subject = subject,
+            front = "$title: Important Fact",
+            back = "A memorable fact and its context to retain for prelims."
+        ),
+        Flashcard(
+            id = 3,
+            subject = subject,
+            front = "$title: PYQ Angle",
+            back = "How this topic has been framed in past questions."
+        ),
+        Flashcard(
+            id = 4,
+            subject = subject,
+            front = "$title: Data Point",
+            back = "One number / report to quote for $title with a short takeaway."
+        ),
+        Flashcard(
+            id = 5,
+            subject = subject,
+            front = "$title: Pitfall",
+            back = "Common trick/confusion for $title and how to avoid it."
+        )
+    )
+}
+
 data class ReferenceBook(
     val title: String,
     val author: String,
@@ -96,7 +149,13 @@ data class ReferenceBook(
 // ---------- main screen ----------
 
 @Composable
-fun NotesScreen(navController: NavController) {
+fun NotesScreen(
+    navController: NavController,
+    subjectFilter: String? = null,
+    focusLastNote: Boolean = false,
+    flashcardsSubject: String? = null
+) {
+    val context = LocalContext.current
     val listState = rememberLazyListState()
     var searchQuery by remember { mutableStateOf("") }
 
@@ -152,15 +211,22 @@ fun NotesScreen(navController: NavController) {
         )
     }
 
+    val normalizedSubjectFilter = subjectFilter?.lowercase()?.trim()
     val filteredNotes = notes.filter { note ->
-        searchQuery.isBlank() ||
+        val subjectMatches = normalizedSubjectFilter?.let { sf ->
+            note.subjectTag.lowercase().contains(sf)
+        } ?: true
+        val searchMatches = searchQuery.isBlank() ||
                 note.title.contains(searchQuery, ignoreCase = true) ||
                 note.preview.contains(searchQuery, ignoreCase = true) ||
                 note.tags.any { it.contains(searchQuery, ignoreCase = true) }
+        subjectMatches && searchMatches
     }
-    var visibleNotesCount by rememberSaveable { mutableStateOf(2) }
-    LaunchedEffect(filteredNotes.size) {
-        visibleNotesCount = visibleNotesCount.coerceAtMost(filteredNotes.size).coerceAtLeast(2)
+
+    var visibleNotesCount by rememberSaveable { mutableStateOf(if (focusLastNote) filteredNotes.size else 2) }
+    LaunchedEffect(filteredNotes.size, focusLastNote) {
+        val min = if (focusLastNote) filteredNotes.size else 2
+        visibleNotesCount = visibleNotesCount.coerceAtMost(filteredNotes.size).coerceAtLeast(min.coerceAtMost(filteredNotes.size))
     }
     val visibleNotes = filteredNotes.take(visibleNotesCount)
     val canExpandNotes = visibleNotesCount < filteredNotes.size
@@ -214,7 +280,7 @@ fun NotesScreen(navController: NavController) {
             items(visibleNotes, key = { it.id }) { note ->
                 NoteCard(
                     note = note,
-                    onShareClick = { /* TODO */ }
+                    onShareClick = { shareNote(context, note) }
                 )
             }
 
@@ -538,7 +604,178 @@ private fun TagChip(text: String) {
     }
 }
 
-// ---------- tip ----------
+@Composable
+fun FlashcardsScreen(navController: NavController, subjectName: String) {
+    val flashcards = remember(subjectName) { buildFlashcardsForSubject(subjectName) }
+    val accent = when {
+        subjectName.contains("history", true) -> Color(0xFF8E44AD)
+        subjectName.contains("polity", true) -> Color(0xFF2E86DE)
+        subjectName.contains("economy", true) -> Color(0xFFF39C12)
+        subjectName.contains("environment", true) -> Color(0xFF27AE60)
+        subjectName.contains("science", true) -> Color(0xFF17A2B8)
+        else -> Color(0xFF2563EB)
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                Brush.verticalGradient(
+                    listOf(
+                        accent.copy(alpha = 0.08f),
+                        MaterialTheme.colorScheme.background
+                    )
+                )
+            )
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            IconButton(onClick = { navController.popBackStack() }) {
+                Icon(
+                    imageVector = Icons.Filled.ArrowBack,
+                    contentDescription = "Back"
+                )
+            }
+            Column {
+                Text(
+                    text = if (subjectName.isNotBlank()) "$subjectName Flashcards" else "Flashcards",
+                    style = MaterialTheme.typography.titleLarge.copy(
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                )
+                Text(
+                    text = "Tap a card to flip. Quick recall, zero clutter.",
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                    )
+                )
+            }
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            AssistChip(
+                onClick = {},
+                label = { Text("${flashcards.size} cards") },
+                colors = AssistChipDefaults.assistChipColors(
+                    containerColor = accent.copy(alpha = 0.14f),
+                    labelColor = accent
+                )
+            )
+            AssistChip(
+                onClick = {},
+                label = { Text("Tap to flip") },
+                colors = AssistChipDefaults.assistChipColors(
+                    containerColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f),
+                    labelColor = MaterialTheme.colorScheme.onSurface
+                )
+            )
+        }
+
+        val flippedStates = remember { mutableStateListOf<Boolean>().apply { addAll(List(flashcards.size) { false }) } }
+
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 24.dp)
+        ) {
+            items(flashcards.size) { idx ->
+                val card = flashcards[idx]
+                val flipped = flippedStates[idx]
+                FlashcardItem(
+                    card = card,
+                    accent = accent,
+                    flipped = flipped,
+                    onFlip = { flippedStates[idx] = !flipped }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun FlashcardItem(
+    card: Flashcard,
+    accent: Color,
+    flipped: Boolean,
+    onFlip: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(Color.Transparent),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = ripple(color = accent, bounded = true)
+                ) { onFlip() }
+                .background(
+                    Brush.linearGradient(
+                        listOf(
+                            accent.copy(alpha = 0.16f),
+                            MaterialTheme.colorScheme.surface
+                        )
+                    )
+                )
+                .padding(16.dp)
+        ) {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Text(
+                    text = card.subject,
+                    style = MaterialTheme.typography.labelMedium.copy(
+                        color = accent,
+                        fontWeight = FontWeight.Medium
+                    )
+                )
+                Surface(
+                    shape = RoundedCornerShape(50),
+                    color = accent.copy(alpha = 0.14f),
+                    tonalElevation = 0.dp,
+                    shadowElevation = 0.dp
+                ) {
+                    Text(
+                        text = if (flipped) "Back" else "Front",
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        style = MaterialTheme.typography.labelMedium.copy(
+                            fontWeight = FontWeight.SemiBold,
+                            color = accent
+                        )
+                    )
+                }
+                Text(
+                    text = if (flipped) card.back else card.front,
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                )
+                Text(
+                    text = if (flipped) "Tap to view front" else "Tap to view back",
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                    )
+                )
+            }
+        }
+    }
+}
 
 @Composable
 private fun NoteTakingTipCard() {
@@ -796,7 +1033,14 @@ private fun NoteTakingTipCard() {
     
             book.units.forEachIndexed { idx, unit ->
                 Card(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            val s = Uri.encode(subjectName)
+                            val b = Uri.encode(bookTitle)
+                            val u = Uri.encode(unit)
+                            navController.navigate("notes_unit_notes/$s/$b/$u")
+                        },
                     shape = RoundedCornerShape(14.dp),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                     elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
@@ -825,7 +1069,117 @@ private fun NoteTakingTipCard() {
             }
 
         
-        private fun buildReferenceBooks(): Map<String, List<ReferenceBook>> {
+@Composable
+fun NotesUnitNotesScreen(
+    subjectName: String,
+    bookTitle: String,
+    unitTitle: String,
+    navController: NavController
+) {
+    val scrollState = rememberScrollState()
+    val demoNotes = remember { buildUnitNotes(unitTitle, subjectName) }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .padding(16.dp)
+            .verticalScroll(scrollState),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            IconButton(onClick = { navController.popBackStack() }) {
+                Icon(imageVector = Icons.Filled.ArrowBack, contentDescription = "Back")
+            }
+            Column {
+                Text(
+                    text = unitTitle,
+                    style = MaterialTheme.typography.titleLarge.copy(
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                )
+                Text(
+                    text = "$subjectName • $bookTitle",
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                    )
+                )
+            }
+        }
+
+        Text(
+            text = "Quick Summary",
+            style = MaterialTheme.typography.titleMedium.copy(
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+        )
+        Text(
+            text = "Demo notes for this unit. Replace with backend content when available.",
+            style = MaterialTheme.typography.bodyMedium.copy(
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+            )
+        )
+
+        val combinedBody = demoNotes.joinToString(separator = " ") { it.body }
+        Text(
+            text = combinedBody,
+            style = MaterialTheme.typography.bodyLarge.copy(
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.9f)
+            )
+        )
+    }
+}
+
+private data class UnitNote(val title: String, val body: String)
+
+private fun buildUnitNotes(unitTitle: String, subjectName: String): List<UnitNote> {
+    val unit = unitTitle.ifBlank { "Unit" }
+    val subject = subjectName.ifBlank { "Subject" }
+    return listOf(
+        UnitNote(
+            title = "Key concepts",
+            body = "This is a demo note for $unit in $subject. Summarize the core theory, list must-know definitions, and flag 2–3 tricky areas."
+        ),
+        UnitNote(
+            title = "PYQ angle",
+            body = "Add how this topic was framed in previous questions. Mention command words (analyze, discuss, evaluate) and common pitfalls."
+        ),
+        UnitNote(
+            title = "Memory hooks",
+            body = "Create mnemonics, diagrams, or flow charts that help recall the sequence and causal links for $unit."
+        )
+    )
+}
+
+private fun shareNote(context: android.content.Context, note: NoteItem) {
+    runCatching {
+        val shareText = buildString {
+            appendLine(note.title)
+            appendLine()
+            appendLine(note.preview)
+            if (note.tags.isNotEmpty()) {
+                appendLine()
+                append("Tags: ")
+                append(note.tags.joinToString(", "))
+            }
+        }
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_SUBJECT, note.title)
+            putExtra(Intent.EXTRA_TEXT, shareText)
+        }
+        context.startActivity(Intent.createChooser(intent, "Share note via"))
+    }.onFailure {
+        Toast.makeText(context, "No app available to share this note.", Toast.LENGTH_SHORT).show()
+    }
+}
+
+private fun buildReferenceBooks(): Map<String, List<ReferenceBook>> {
             fun book(title: String, author: String, summary: String, units: List<String>) =
                 ReferenceBook(title, author, summary, units)
         
@@ -1029,45 +1383,43 @@ private fun NoteTakingTipCard() {
                     author = "Shankar IAS",
                     summary = "Flagship environment text.",
                     units = listOf("Ecology basics", "Biodiversity & PAs", "Pollution & climate")
+                ),
+                book(
+                    "PMF IAS Environment",
+                    "PMF IAS",
+                    "Diagram-rich environment notes.",
+                    listOf("Ecology & cycles", "Conventions & acts", "Climate & pollution")
+                ),
+                book(
+                    "NCERT Bio Environment Units",
+                    "NCERT",
+                    "School-level environment grounding.",
+                    listOf("Organisms & populations", "Environmental issues", "Conservation basics")
+                ),
+                book(
+                    "Majid Husain Environment",
+                    "Majid Husain",
+                    "UPSC-focused environment coverage.",
+                    listOf("Ecology foundations", "Biodiversity", "Climate & disasters")
+                ),
+                book(
+                    "Down To Earth Compendium",
+                    "CEE/DTL",
+                    "Annual environment reports digest.",
+                    listOf("Pollution & waste", "Climate & energy", "Biodiversity governance")
+                ),
+                book(
+                    "Environmental Studies",
+                    "R. Rajagopalan",
+                    "Fundamentals with Indian context.",
+                    listOf("Ecosystems", "Conservation", "Pollution & policy")
+                ),
+                book(
+                    "Report Summaries",
+                    "UNEP/WWF/IPCC",
+                    "Curated global report notes.",
+                    listOf("IPCC/UNEP updates", "WWF/IPBES insights", "India-specific reports")
                 )
-            )
-
-
-            book(
-                "PMF IAS Environment",
-                "PMF IAS",
-                "Diagram-rich environment notes.",
-                listOf("Ecology & cycles", "Conventions & acts", "Climate & pollution")
-            );
-            book(
-                "NCERT Bio Environment Units",
-                "NCERT",
-                "School-level environment grounding.",
-                listOf("Organisms & populations", "Environmental issues", "Conservation basics")
-            );
-            book(
-                "Majid Husain Environment",
-                "Majid Husain",
-                "UPSC-focused environment coverage.",
-                listOf("Ecology foundations", "Biodiversity", "Climate & disasters")
-            );
-            book(
-                "Down To Earth Compendium",
-                "CEE/DTL",
-                "Annual environment reports digest.",
-                listOf("Pollution & waste", "Climate & energy", "Biodiversity governance")
-            );
-            book(
-                "Environmental Studies",
-                "R. Rajagopalan",
-                "Fundamentals with Indian context.",
-                listOf("Ecosystems", "Conservation", "Pollution & policy")
-            );
-            book(
-                "Report Summaries",
-                "UNEP/WWF/IPCC",
-                "Curated global report notes.",
-                listOf("IPCC/UNEP updates", "WWF/IPBES insights", "India-specific reports")
             )
 
     

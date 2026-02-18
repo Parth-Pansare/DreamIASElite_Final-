@@ -211,6 +211,7 @@ private fun SubjectCard(subject: SubjectCardData, modifier: Modifier = Modifier,
 @Composable
 fun SubjectBooksScreen(subjectName: String, navController: NavController) {
     val books = buildSubjectBooks()[subjectName] ?: emptyList()
+    val encodedSubject = Uri.encode(subjectName)
 
     Column(
         modifier = Modifier
@@ -256,7 +257,10 @@ fun SubjectBooksScreen(subjectName: String, navController: NavController) {
             subjectName = subjectName,
             onStart = {
                 val encoded = Uri.encode("$subjectName Full Length")
-                navController.navigate("test_session/$encoded")
+                val origin = Uri.encode("test_books/$encodedSubject")
+                navController.navigate(
+                    "test_session/$encoded?origin=$origin&originType=books&originSubject=$encodedSubject"
+                )
             }
         )
 
@@ -264,7 +268,6 @@ fun SubjectBooksScreen(subjectName: String, navController: NavController) {
             BookCard(
                 book = book,
                 onOpenUnits = {
-                    val encodedSubject = Uri.encode(subjectName)
                     val encodedBook = Uri.encode(book.title)
                     navController.navigate("test_units/$encodedSubject/$encodedBook")
                 }
@@ -394,6 +397,8 @@ private fun BookCard(
 @Composable
 fun BookUnitsScreen(subjectName: String, bookTitle: String, navController: NavController) {
     val book = buildSubjectBooks()[subjectName]?.firstOrNull { it.title == bookTitle }
+    val encodedSubject = Uri.encode(subjectName)
+    val encodedBook = Uri.encode(bookTitle)
 
     Column(
         modifier = Modifier
@@ -450,7 +455,10 @@ fun BookUnitsScreen(subjectName: String, bookTitle: String, navController: NavCo
                 unit = unit,
                 onStart = {
                     val encoded = Uri.encode("${book.title} - ${unit.name}")
-                    navController.navigate("test_session/$encoded")
+                    val origin = Uri.encode("test_units/$encodedSubject/$encodedBook")
+                    navController.navigate(
+                        "test_session/$encoded?origin=$origin&originType=units&originSubject=$encodedSubject&originBook=$encodedBook"
+                    )
                 }
             )
         }

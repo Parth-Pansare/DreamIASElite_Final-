@@ -8,6 +8,8 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -39,18 +41,28 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.app.dreamiaselite.ui.screen.screens.auth.AuthScreen
 import com.app.dreamiaselite.ui.screen.screens.auth.AuthViewModel
 import com.app.dreamiaselite.ui.screen.screens.auth.AuthUiState
 import com.app.dreamiaselite.ui.screens.currentaffairs.CurrentAffairsScreen
+import com.app.dreamiaselite.ui.screens.currentaffairs.CurrentAffairDetailScreen
+import com.app.dreamiaselite.ui.screens.currentaffairs.MonthlyCaTestData
+import com.app.dreamiaselite.ui.screens.currentaffairs.MonthlyCaTestScreen
 import com.app.dreamiaselite.ui.screens.dashboard.DashboardScreen
+import com.app.dreamiaselite.ui.screens.dashboard.DashboardSectionListScreen
+import com.app.dreamiaselite.ui.screens.dashboard.DashboardSectionType
 import com.app.dreamiaselite.ui.screens.dashboard.SubjectDashboardScreen
 import com.app.dreamiaselite.ui.screen.screens.notes.NotesScreen
 import com.app.dreamiaselite.ui.screen.screens.notes.NotesReferenceBooksScreen
 import com.app.dreamiaselite.ui.screen.screens.notes.NotesReferenceUnitsScreen
+import com.app.dreamiaselite.ui.screen.screens.notes.NotesUnitNotesScreen
+import com.app.dreamiaselite.ui.screen.screens.notes.FlashcardsScreen
 import com.app.dreamiaselite.ui.screen.screens.profile.ProfileScreen
 import com.app.dreamiaselite.ui.screen.screens.pyq.PyqScreen
 import com.app.dreamiaselite.ui.screen.screens.pyq.PyqPaperDetailScreen
+import com.app.dreamiaselite.ui.screen.screens.pyq.PyqTestScreen
+import com.app.dreamiaselite.ui.screen.screens.pyq.PyqTestResultScreen
 import com.app.dreamiaselite.ui.screen.screens.tests.TestsScreen
 import com.app.dreamiaselite.ui.screen.screens.tests.TestSubjectScreen
 import com.app.dreamiaselite.ui.screen.screens.tests.TestSessionScreen
@@ -63,7 +75,6 @@ import com.app.dreamiaselite.ui.theme.LocalThemeController
 import com.app.dreamiaselite.ui.theme.ThemeController
 import kotlinx.coroutines.launch
 import com.app.dreamiaselite.ui.screen.screens.theme.ThemeAppearanceScreen
-import com.app.dreamiaselite.ui.screen.screens.settings.SettingsScreen
 import com.app.dreamiaselite.ui.screen.screens.help.HelpFeedbackScreen
 import com.app.dreamiaselite.ui.screen.screens.about.AboutPrivacyScreen
 import kotlinx.coroutines.Dispatchers
@@ -134,78 +145,72 @@ fun DreamIasApp() {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
 
-    when {
-        authState.isLoading -> {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(MaterialTheme.colorScheme.background),
-                contentAlignment = Alignment.Center
-            ) {
-                CircularProgressIndicator()
-            }
+    if (authState.isLoading) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            CircularProgressIndicator()
         }
-        !authState.isAuthenticated -> {
-            AuthScreen(
-                state = authState,
-                onLogin = { email, password -> authViewModel.login(email, password) },
-                onRegister = { email, username, targetYear, password ->
-                    authViewModel.register(email, username, targetYear, password)
-                },
-                onClearError = { authViewModel.clearError() }
-            )
-        }
-        else -> {
-            ModalNavigationDrawer(
-                drawerState = drawerState,
-                drawerContent = {
-                    DreamDrawer(
-                        currentRoute = currentRoute,
-                        userName = authState.currentUserName,
-                        userEmail = authState.currentUserEmail,
-                        avatarUrl = authState.avatarUrl,
-                        onItemClick = { route ->
-                            scope.launch { drawerState.close() }
+    } else if (!authState.isAuthenticated) {
+        AuthScreen(
+            state = authState,
+            onLogin = { email, password -> authViewModel.login(email, password) },
+            onRegister = { email, username, targetYear, password ->
+                authViewModel.register(email, username, targetYear, password)
+            },
+            onClearError = { authViewModel.clearError() }
+        )
+    } else {
+        ModalNavigationDrawer(
+            drawerState = drawerState,
+            drawerContent = {
+                DreamDrawer(
+                    currentRoute = currentRoute,
+                    userName = authState.currentUserName,
+                    userEmail = authState.currentUserEmail,
+                    avatarUrl = authState.avatarUrl,
+                    onItemClick = { route ->
+                        scope.launch { drawerState.close() }
 
-                            when {
-                                route == "logout" -> {
-                                    showLogoutDialog = true
-                                }
-                                route != null && route != currentRoute -> {
-                                    navController.navigate(route) {
-                                        popUpTo(navController.graph.findStartDestination().id) {
-                                            saveState = true
-                                        }
-                                        launchSingleTop = true
-                                        restoreState = true
+                        when {
+                            route == "logout" -> {
+                                showLogoutDialog = true
+                            }
+                            route != null && route != currentRoute -> {
+                                navController.navigate(route) {
+                                    popUpTo(navController.graph.findStartDestination().id) {
+                                        saveState = true
                                     }
+                                    launchSingleTop = true
+                                    restoreState = true
                                 }
                             }
                         }
-                    )
-                }
-            ) {
-                Scaffold(
-                    topBar = {
-                        DreamTopBar(
-                            currentRoute = currentRoute,
-                            onMenuClick = { scope.launch { drawerState.open() } }
-                        )
-                    },
-                    bottomBar = {
-                        DreamBottomBar(navController)
                     }
-                ) { padding ->
-                    DreamNavHost(
-                        navController = navController,
-                        modifier = Modifier.padding(padding),
-                        authState = authState,
-                        onUpdateProfile = { name, targetYear, avatarUri ->
-                            authViewModel.updateProfile(name, targetYear, avatarUri)
-                        },
-                        onClearProfileMessage = { authViewModel.clearProfileMessage() }
+                )
+            }
+        ) {
+            Scaffold(
+                topBar = {
+                    DreamTopBar(
+                        currentRoute = currentRoute,
+                        onMenuClick = { scope.launch { drawerState.open() } }
                     )
+                },
+                bottomBar = {
+                    DreamBottomBar(navController)
                 }
+            ) { padding ->
+                DreamNavHost(
+                    navController = navController,
+                    modifier = Modifier.padding(padding),
+                    authState = authState,
+                    onUpdateProfile = { name, targetYear, avatarUri ->
+                        authViewModel.updateProfile(name, targetYear, avatarUri)
+                    },
+                    onClearProfileMessage = { authViewModel.clearProfileMessage() }
+                )
             }
         }
     }
@@ -247,17 +252,21 @@ fun DreamTopBar(
     currentRoute: String?,
     onMenuClick: () -> Unit
 ) {
-    val title = when (currentRoute) {
-        BottomNavItem.Home.route -> "Dashboard"
-        BottomNavItem.CurrentAffairs.route -> "Current Affairs"
-        BottomNavItem.Tests.route -> "Test Series"
-        BottomNavItem.Pyq.route -> "Previous Year Questions"
-        BottomNavItem.Notes.route -> "Notes"
-        "theme_appearance" -> "Theme & Appearance"
-        "settings" -> "Settings"
-        "help_feedback" -> "Help & Feedback"
-        "about_privacy" -> "About & Privacy"
-        "study_planner" -> "Study Planner"
+    val title = when {
+        currentRoute?.startsWith("current_affair_detail") == true -> "Current Affairs"
+        currentRoute?.startsWith("monthly_ca_test") == true -> "Current Affairs Test"
+        currentRoute?.startsWith("dashboard_section/ca") == true -> "Monthly Current Affairs"
+        currentRoute?.startsWith("dashboard_section/test") == true -> "Monthly CA Tests"
+        currentRoute?.startsWith("pyq_paper") == true -> "Previous Year Questions"
+        currentRoute == BottomNavItem.Home.route -> "Dashboard"
+        currentRoute == BottomNavItem.CurrentAffairs.route -> "Current Affairs"
+        currentRoute == BottomNavItem.Tests.route -> "Test Series"
+        currentRoute == BottomNavItem.Pyq.route -> "Previous Year Questions"
+        currentRoute == BottomNavItem.Notes.route -> "Notes"
+        currentRoute == "theme_appearance" -> "Theme & Appearance"
+        currentRoute == "help_feedback" -> "Help"
+        currentRoute == "about_privacy" -> "About & Privacy"
+        currentRoute == "study_planner" -> "Study Planner"
         else -> "Dream IAS Elite"
     }
 
@@ -287,6 +296,8 @@ fun DreamDrawer(
     onItemClick: (String?) -> Unit
 ) {
 
+    val drawerScrollState = rememberScrollState()
+
     // Remember drawer items to prevent recreation on each recomposition
     val accountItems = remember {
         listOf(
@@ -297,16 +308,14 @@ fun DreamDrawer(
 
     val studyToolsItems = remember {
         listOf(
-            DrawerItem("Study Planner", route = "study_planner", icon = Icons.Outlined.EventNote, subtitle = "Daily / weekly targets"),
-            DrawerItem("Downloads & Offline", icon = Icons.Outlined.Download, subtitle = "Saved tests, notes, videos", badge = "Soon")
+            DrawerItem("Study Planner", route = "study_planner", icon = Icons.Outlined.EventNote, subtitle = "Daily / weekly targets")
         )
     }
 
     val appItems = remember {
         listOf(
             DrawerItem("Theme & Appearance", route = "theme_appearance", icon = Icons.Outlined.Palette),
-            DrawerItem("Settings", route = "settings", icon = Icons.Outlined.Settings),
-            DrawerItem("Help & Feedback", route = "help_feedback", icon = Icons.Outlined.HelpOutline),
+            DrawerItem("Help", route = "help_feedback", icon = Icons.Outlined.HelpOutline),
             DrawerItem("About & Privacy Policy", route = "about_privacy", icon = Icons.Outlined.Info),
             DrawerItem("Logout", route = "logout", icon = Icons.Outlined.Logout)
         )
@@ -317,11 +326,21 @@ fun DreamDrawer(
         drawerShape = RoundedCornerShape(topEnd = 24.dp, bottomEnd = 24.dp),
         modifier = Modifier.fillMaxWidth(0.7f)
     ) {
-        DrawerHeader(userName = userName, userEmail = userEmail, avatarUrl = avatarUrl)
+        Column(modifier = Modifier.fillMaxHeight()) {
+            DrawerHeader(userName = userName, userEmail = userEmail, avatarUrl = avatarUrl)
 
-        DrawerSection("Account", accountItems, currentRoute, onItemClick)
-        DrawerSection("Study Tools", studyToolsItems, currentRoute, onItemClick)
-        DrawerSection("App", appItems, currentRoute, onItemClick)
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .verticalScroll(drawerScrollState)
+            ) {
+                DrawerSection("Account", accountItems, currentRoute, onItemClick)
+                DrawerSection("Study Tools", studyToolsItems, currentRoute, onItemClick)
+                DrawerSection("App", appItems, currentRoute, onItemClick)
+
+                Spacer(Modifier.height(12.dp))
+            }
+        }
     }
 }
 
@@ -492,7 +511,10 @@ fun DreamBottomBar(navController: NavHostController) {
     fun rootForRoute(route: String?): String? {
         if (route == null) return null
         return when {
-            route == BottomNavItem.Home.route || route.startsWith("subject_dashboard") -> BottomNavItem.Home.route
+            route == BottomNavItem.Home.route ||
+                    route.startsWith("subject_dashboard") ||
+                    route.startsWith("monthly_ca_test") ||
+                    route.startsWith("dashboard_section") -> BottomNavItem.Home.route
             route.startsWith("test_") || route == BottomNavItem.Tests.route -> BottomNavItem.Tests.route
             route.startsWith("pyq") || route == BottomNavItem.Pyq.route -> BottomNavItem.Pyq.route
             route.startsWith("notes") || route == BottomNavItem.Notes.route -> BottomNavItem.Notes.route
@@ -548,10 +570,30 @@ fun DreamNavHost(
     ) {
 
         composable(BottomNavItem.Home.route) { DashboardScreen(navController, authState.currentUserName) }
-        composable(BottomNavItem.CurrentAffairs.route) { CurrentAffairsScreen() }
+        composable("dashboard_section/{type}") { entry ->
+            val typeKey = entry.arguments?.getString("type") ?: return@composable
+            val sectionType = DashboardSectionType.fromKey(typeKey) ?: return@composable
+            DashboardSectionListScreen(sectionType = sectionType, navController = navController)
+        }
+        composable(BottomNavItem.CurrentAffairs.route) { CurrentAffairsScreen(navController) }
         composable(BottomNavItem.Tests.route) { TestsScreen(navController) }
         composable(BottomNavItem.Pyq.route) { PyqScreen(navController) }
         composable(BottomNavItem.Notes.route) { NotesScreen(navController) }
+        composable("notes_last_opened/{subject}") { entry ->
+            val subject = entry.arguments?.getString("subject")?.let { Uri.decode(it) } ?: ""
+            NotesScreen(
+                navController = navController,
+                subjectFilter = subject,
+                focusLastNote = true
+            )
+        }
+        composable("notes_flashcards/{subject}") { entry ->
+            val subject = entry.arguments?.getString("subject")?.let { Uri.decode(it) } ?: ""
+            FlashcardsScreen(
+                navController = navController,
+                subjectName = subject
+            )
+        }
         composable("profile") {
             ProfileScreen(
                 navController = navController,
@@ -573,7 +615,6 @@ fun DreamNavHost(
         }
 
         composable("theme_appearance") { ThemeAppearanceScreen() }
-        composable("settings") { SettingsScreen() }
         composable("help_feedback") {
             HelpFeedbackScreen(
                 currentUserEmail = authState.currentUserEmail
@@ -598,9 +639,28 @@ fun DreamNavHost(
             val name = entry.arguments?.getString("name") ?: "Tests"
             TestSubjectScreen(Uri.decode(name), navController)
         }
-        composable("test_session/{subject}") { entry ->
+        composable(
+            route = "test_session/{subject}?origin={origin}&originType={originType}&originSubject={originSubject}&originBook={originBook}",
+            arguments = listOf(
+                navArgument("origin") { nullable = true; defaultValue = null },
+                navArgument("originType") { nullable = true; defaultValue = null },
+                navArgument("originSubject") { nullable = true; defaultValue = null },
+                navArgument("originBook") { nullable = true; defaultValue = null }
+            )
+        ) { entry ->
             val subject = entry.arguments?.getString("subject") ?: "Test"
-            TestSessionScreen(Uri.decode(subject), navController)
+            val origin = entry.arguments?.getString("origin")
+            val originType = entry.arguments?.getString("originType")
+            val originSubject = entry.arguments?.getString("originSubject")
+            val originBook = entry.arguments?.getString("originBook")
+            TestSessionScreen(
+                subjectName = Uri.decode(subject),
+                navController = navController,
+                originRoute = origin,
+                originType = originType,
+                originSubject = originSubject,
+                originBook = originBook
+            )
         }
         composable("test_result") {
             TestResultScreen(navController)
@@ -608,6 +668,23 @@ fun DreamNavHost(
         composable("pyq_paper/{paperId}") { entry ->
             val paperId = entry.arguments?.getString("paperId") ?: return@composable
             PyqPaperDetailScreen(navController, paperId)
+        }
+        composable("pyq_test/{paperId}") { entry ->
+            val paperId = entry.arguments?.getString("paperId") ?: return@composable
+            PyqTestScreen(navController, paperId)
+        }
+        composable(
+            route = "pyq_test_result/{paperId}?selected={selected}",
+            arguments = listOf(
+                navArgument("selected") {
+                    nullable = true
+                    defaultValue = null
+                }
+            )
+        ) { entry ->
+            val paperId = entry.arguments?.getString("paperId") ?: return@composable
+            val selected = entry.arguments?.getString("selected")
+            PyqTestResultScreen(navController, paperId, selected)
         }
         composable("notes_reference/{subject}") { entry ->
             val subject = entry.arguments?.getString("subject") ?: return@composable
@@ -617,6 +694,34 @@ fun DreamNavHost(
             val subject = entry.arguments?.getString("subject") ?: return@composable
             val book = entry.arguments?.getString("book") ?: return@composable
             NotesReferenceUnitsScreen(Uri.decode(subject), Uri.decode(book), navController)
+        }
+        composable("notes_unit_notes/{subject}/{book}/{unit}") { entry ->
+            val subject = entry.arguments?.getString("subject") ?: return@composable
+            val book = entry.arguments?.getString("book") ?: return@composable
+            val unit = entry.arguments?.getString("unit") ?: return@composable
+            NotesUnitNotesScreen(
+                subjectName = Uri.decode(subject),
+                bookTitle = Uri.decode(book),
+                unitTitle = Uri.decode(unit),
+                navController = navController
+            )
+        }
+        composable("current_affair_detail/{articleId}") { entry ->
+            val articleId = entry.arguments?.getString("articleId")?.toIntOrNull() ?: return@composable
+            CurrentAffairDetailScreen(articleId = articleId, navController = navController)
+        }
+        composable("monthly_ca_test/{testId}") { entry ->
+            val testId = entry.arguments?.getString("testId")?.toIntOrNull() ?: return@composable
+            MonthlyCaTestScreen(testId = testId, navController = navController)
+        }
+        composable("monthly_ca_test_session/{testId}") { entry ->
+            val testId = entry.arguments?.getString("testId")?.toIntOrNull() ?: return@composable
+            val testTitle = MonthlyCaTestData.getById(testId)?.title ?: "Monthly CA Test"
+            TestSessionScreen(
+                subjectName = testTitle,
+                navController = navController,
+                originRoute = "dashboard_section/test"
+            )
         }
     }
 }

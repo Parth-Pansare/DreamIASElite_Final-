@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ArrowForward
@@ -18,17 +17,18 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
+import com.app.dreamiaselite.BottomNavItem
 import com.app.dreamiaselite.ui.theme.*
-import kotlinx.coroutines.delay
 
 //-------------------------------------------------------
 // Data Model
@@ -38,46 +38,183 @@ data class HomeSectionItem(
     val title: String,
     val subtitle: String,
     val tag: String,
-    val meta: String
+    val meta: String,
+    val articleId: Int? = null,
+    val testId: Int? = null
 )
 
-data class LoadMoreState(
-    val visibleCount: Int,
-    val buttonLabel: String?,
-    val onClick: () -> Unit
-)
+enum class DashboardSectionType(
+    val key: String,
+    val headerTitle: String,
+    val caption: String,
+    val highlightColor: Color
+) {
+    CurrentAffairs(
+        key = "ca",
+        headerTitle = "Monthly Current Affairs",
+        caption = "Curated for UPSC CSE",
+        highlightColor = AccentCyan
+    ),
+    CurrentAffairsTest(
+        key = "test",
+        headerTitle = "Monthly Current Affairs Test",
+        caption = "Based on your preparation pattern",
+        highlightColor = AccentLavender
+    );
 
-@Composable
-fun rememberLoadMoreState(
-    totalItems: Int,
-    initialVisible: Int,
-    steps: List<Int> = listOf(4, 5)
-): LoadMoreState {
-    var visibleCount by rememberSaveable { mutableStateOf(initialVisible) }
-    var stepIndex by rememberSaveable { mutableStateOf(0) }
-
-    LaunchedEffect(totalItems) {
-        visibleCount = initialVisible.coerceAtMost(totalItems)
-        stepIndex = 0
+    companion object {
+        fun fromKey(key: String?): DashboardSectionType? =
+            values().firstOrNull { it.key == key }
     }
+}
 
-    val hasMore = visibleCount < totalItems
-    val label = when {
-        !hasMore -> null
-        stepIndex == 0 -> "View all"
-        else -> "View more"
-    }
-
-    return LoadMoreState(
-        visibleCount = visibleCount,
-        buttonLabel = label,
-        onClick = onClick@{
-            if (!hasMore) return@onClick
-            val increment = steps.getOrNull(stepIndex) ?: (totalItems - visibleCount)
-            visibleCount = (visibleCount + increment).coerceAtMost(totalItems)
-            stepIndex += 1
-        }
+private val monthlyCurrentAffairsItems = listOf(
+    HomeSectionItem(
+        title = "RBI Monetary Policy Review",
+        subtitle = "Economy • GS3",
+        tag = "Current Affairs",
+        meta = "Updated today",
+        articleId = 1
+    ),
+    HomeSectionItem(
+        title = "New Environment Treaty Signed",
+        subtitle = "Environment • GS3",
+        tag = "Current Affairs",
+        meta = "Key facts & analysis",
+        articleId = 2
+    ),
+    HomeSectionItem(
+        title = "Supreme Court ruling on FRs",
+        subtitle = "Polity • GS2",
+        tag = "Current Affairs",
+        meta = "Judgment highlights",
+        articleId = 3
+    ),
+    HomeSectionItem(
+        title = "India’s GDP forecast updated",
+        subtitle = "Economy • GS3",
+        tag = "Current Affairs",
+        meta = "Data-driven brief",
+        articleId = 4
+    ),
+    HomeSectionItem(
+        title = "New MSP changes explained",
+        subtitle = "Agriculture • GS3",
+        tag = "Current Affairs",
+        meta = "What to watch",
+        articleId = 5
+    ),
+    HomeSectionItem(
+        title = "Blue Economy push",
+        subtitle = "Environment • GS3",
+        tag = "Current Affairs",
+        meta = "Schemes & targets",
+        articleId = 6
+    ),
+    HomeSectionItem(
+        title = "AI regulation paper",
+        subtitle = "Sci-Tech • GS3",
+        tag = "Current Affairs",
+        meta = "Global snapshots",
+        articleId = 7
+    ),
+    HomeSectionItem(
+        title = "G20 outcomes tracker",
+        subtitle = "IR • GS2",
+        tag = "Current Affairs",
+        meta = "Action points",
+        articleId = 8
+    ),
+    HomeSectionItem(
+        title = "Mission LiFE updates",
+        subtitle = "Environment • GS3",
+        tag = "Current Affairs",
+        meta = "Targets & states",
+        articleId = 9
+    ),
+    HomeSectionItem(
+        title = "NATO expansion brief",
+        subtitle = "IR • GS2",
+        tag = "Current Affairs",
+        meta = "Timeline & map",
+        articleId = 10
+    ),
+    HomeSectionItem(
+        title = "Quantum tech roadmap",
+        subtitle = "Sci-Tech • GS3",
+        tag = "Current Affairs",
+        meta = "Key milestones",
+        articleId = 11
+    ),
+    HomeSectionItem(
+        title = "Forest (Amendment) Act",
+        subtitle = "Environment • GS3",
+        tag = "Current Affairs",
+        meta = "Core provisions",
+        articleId = 12
     )
+)
+
+private val monthlyCurrentAffairsTestItems = listOf(
+    HomeSectionItem(
+        title = "Monthly CA Test - November",
+        subtitle = "50 Q • GS1/GS2/GS3 blend",
+        tag = "Current Affairs Test",
+        meta = "Updated yesterday",
+        testId = 101
+    ),
+    HomeSectionItem(
+        title = "Monthly CA Test - October",
+        subtitle = "50 Q • Static + Current mix",
+        tag = "Current Affairs Test",
+        meta = "Adaptive scoring",
+        testId = 102
+    ),
+    HomeSectionItem(
+        title = "Monthly CA Test - September",
+        subtitle = "40 Q • Facts + analysis",
+        tag = "Current Affairs Test",
+        meta = "Timed practice",
+        testId = 103
+    ),
+    HomeSectionItem(
+        title = "Monthly CA Test - August",
+        subtitle = "40 Q • UPSC pattern",
+        tag = "Current Affairs Test",
+        meta = "Calibrated sets",
+        testId = 104
+    ),
+    HomeSectionItem(
+        title = "Monthly CA Test - July",
+        subtitle = "35 Q • GS overlap",
+        tag = "Current Affairs Test",
+        meta = "Revision heavy",
+        testId = 105
+    ),
+    HomeSectionItem(
+        title = "Monthly CA Test - June",
+        subtitle = "35 Q • Mapping + CA",
+        tag = "Current Affairs Test",
+        meta = "Mixed difficulty",
+        testId = 106
+    )
+)
+
+private fun itemsForSection(type: DashboardSectionType): List<HomeSectionItem> = when (type) {
+    DashboardSectionType.CurrentAffairs -> monthlyCurrentAffairsItems
+    DashboardSectionType.CurrentAffairsTest -> monthlyCurrentAffairsTestItems
+}
+
+private fun handleHomeItemNavigation(item: HomeSectionItem, navController: NavHostController) {
+    item.articleId?.let { id ->
+        navController.navigate("current_affair_detail/$id")
+        return
+    }
+    item.testId?.let { id ->
+        navController.navigate("monthly_ca_test/$id")
+        return
+    }
+    navController.navigate(BottomNavItem.Home.route)
 }
 
 //-------------------------------------------------------
@@ -87,160 +224,8 @@ fun rememberLoadMoreState(
 @Composable
 fun DashboardScreen(navController: NavHostController, userName: String? = null) {
 
-    // Remember data items to prevent recreation on each recomposition
-    val caItems = remember {
-        listOf(
-            HomeSectionItem(
-                "RBI Monetary Policy Review",
-                "Economy • GS3",
-                "Current Affairs",
-                "Updated today"
-            ),
-            HomeSectionItem(
-                "New Environment Treaty Signed",
-                "Environment • GS3",
-                "Current Affairs",
-                "Key facts & analysis"
-            ),
-            HomeSectionItem(
-                "Supreme Court ruling on FRs",
-                "Polity • GS2",
-                "Current Affairs",
-                "Judgment highlights"
-            ),
-            HomeSectionItem(
-                "India’s GDP forecast updated",
-                "Economy • GS3",
-                "Current Affairs",
-                "Data-driven brief"
-            ),
-            HomeSectionItem(
-                "New MSP changes explained",
-                "Agriculture • GS3",
-                "Current Affairs",
-                "What to watch"
-            ),
-            HomeSectionItem(
-                "Blue Economy push",
-                "Environment • GS3",
-                "Current Affairs",
-                "Schemes & targets"
-            ),
-            HomeSectionItem(
-                "AI regulation paper",
-                "Sci-Tech • GS3",
-                "Current Affairs",
-                "Global snapshots"
-            ),
-            HomeSectionItem(
-                "G20 outcomes tracker",
-                "IR • GS2",
-                "Current Affairs",
-                "Action points"
-            ),
-            HomeSectionItem(
-                "Mission LiFE updates",
-                "Environment • GS3",
-                "Current Affairs",
-                "Targets & states"
-            ),
-            HomeSectionItem(
-                "NATO expansion brief",
-                "IR • GS2",
-                "Current Affairs",
-                "Timeline & map"
-            ),
-            HomeSectionItem(
-                "Quantum tech roadmap",
-                "Sci-Tech • GS3",
-                "Current Affairs",
-                "Key milestones"
-            ),
-            HomeSectionItem(
-                "Forest (Amendment) Act",
-                "Environment • GS3",
-                "Current Affairs",
-                "Core provisions"
-            )
-        )
-    }
-
-    val testItems = remember {
-        listOf(
-            HomeSectionItem(
-                "Prelims Full Test 1",
-                "100 Q • Timed",
-                "Test Series",
-                "Calibrated to your level"
-            ),
-            HomeSectionItem(
-                "Polity Sectional Test",
-                "30 Q • FRs & DPSP",
-                "Test Series",
-                "Prev best: 72%"
-            ),
-            HomeSectionItem(
-                "Economy Sectional Test",
-                "35 Q • Inflation",
-                "Test Series",
-                "Adaptive difficulty"
-            ),
-            HomeSectionItem(
-                "CSAT Speed Drill",
-                "20 Q • Quant/Reasoning",
-                "Test Series",
-                "Timed practice"
-            ),
-            HomeSectionItem(
-                "Modern History Mini",
-                "15 Q • Spectrum",
-                "Test Series",
-                "Revise fast"
-            ),
-            HomeSectionItem(
-                "Environment Snapshot",
-                "25 Q • Acts & bodies",
-                "Test Series",
-                "Image-heavy"
-            ),
-            HomeSectionItem(
-                "Ancient & Medieval Mix",
-                "28 Q • Culture focus",
-                "Test Series",
-                "Memory hooks"
-            ),
-            HomeSectionItem(
-                "Art & Culture flash",
-                "18 Q • Paintings/Architecture",
-                "Test Series",
-                "Scoring set"
-            ),
-            HomeSectionItem(
-                "Schemes drill",
-                "22 Q • Ministries & themes",
-                "Test Series",
-                "Updated monthly"
-            ),
-            HomeSectionItem(
-                "Mapping workout",
-                "20 Q • Atlas based",
-                "Test Series",
-                "Fast attempts"
-            ),
-            HomeSectionItem(
-                "Science & Tech",
-                "24 Q • Space/Defence",
-                "Test Series",
-                "CA-linked"
-            ),
-            HomeSectionItem(
-                "Ethics mini caselets",
-                "12 Q • GS4",
-                "Test Series",
-                "Situational MCQs"
-            )
-        )
-    }
+    val caItems = remember { monthlyCurrentAffairsItems }
+    val testItems = remember { monthlyCurrentAffairsTestItems }
 
     LazyColumn(
         modifier = Modifier
@@ -275,7 +260,11 @@ fun DashboardScreen(navController: NavHostController, userName: String? = null) 
                 caption = "Curated for UPSC CSE",
                 pillColor = AccentCyan,
                 items = caItems,
-                highlightColor = AccentCyan
+                highlightColor = AccentCyan,
+                onViewAll = {
+                    navController.navigate("dashboard_section/${DashboardSectionType.CurrentAffairs.key}")
+                },
+                onItemClick = { item -> handleHomeItemNavigation(item, navController) }
             )
         }
 
@@ -285,12 +274,16 @@ fun DashboardScreen(navController: NavHostController, userName: String? = null) 
                 caption = "Based on your preparation pattern",
                 pillColor = AccentLavender,
                 items = testItems,
-                highlightColor = AccentLavender
+                highlightColor = AccentLavender,
+                onViewAll = {
+                    navController.navigate("dashboard_section/${DashboardSectionType.CurrentAffairsTest.key}")
+                },
+                onItemClick = { item -> handleHomeItemNavigation(item, navController) }
             )
         }
 
         item { Spacer(Modifier.height(8.dp)) }
-    }
+    }  
 }
 
 @Composable
@@ -299,26 +292,25 @@ private fun DashboardSection(
     caption: String,
     pillColor: Color,
     items: List<HomeSectionItem>,
-    highlightColor: Color
+    highlightColor: Color,
+    onViewAll: () -> Unit,
+    onItemClick: (HomeSectionItem) -> Unit = {}
 ) {
-    val loadState = rememberLoadMoreState(
-        totalItems = items.size,
-        initialVisible = 3
-    )
-    val visibleItems = items.take(loadState.visibleCount)
+    val visibleItems = items.take(3)
 
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         SectionHeader(
             title = title,
             caption = caption,
             pillColor = pillColor,
-            viewButtonLabel = loadState.buttonLabel,
-            onViewAction = loadState.onClick
+            viewButtonLabel = "View all",
+            onViewAction = onViewAll
         )
 
         HorizontalSectionList(
             items = visibleItems,
-            highlightColor = highlightColor
+            highlightColor = highlightColor,
+            onItemClick = onItemClick
         )
     }
 }
@@ -440,10 +432,6 @@ fun DailyProgressCard() {
     }
 }
 
-//-------------------------------------------------------
-// SUBJECT CHIPS
-//-------------------------------------------------------
-
 @Composable
 fun SubjectChipRow(
     subjects: List<String>,
@@ -534,21 +522,76 @@ fun SectionHeader(
 //-------------------------------------------------------
 
 @Composable
-fun HorizontalSectionList(items: List<HomeSectionItem>, highlightColor: Color) {
+fun HorizontalSectionList(
+    items: List<HomeSectionItem>,
+    highlightColor: Color,
+    onItemClick: (HomeSectionItem) -> Unit = {}
+) {
 
-    val listState = rememberLazyListState()
-
-    // Removed auto-scroll infinite loop that was causing performance issues
-    // Users can now scroll manually without unwanted animations
+    val cardHeight: Dp = 150.dp
 
     LazyRow(
-        state = listState,
         horizontalArrangement = Arrangement.spacedBy(14.dp),
         modifier = Modifier.padding(top = 6.dp)
     ) {
         items(items) { item ->
-            HomeCard(item, highlightColor)
+            HomeCard(
+                item = item,
+                highlightColor = highlightColor,
+                height = cardHeight,
+                onCardClick = { onItemClick(item) },
+                modifier = Modifier.width(240.dp)
+            )
         }
+    }
+}
+
+//-------------------------------------------------------
+// VIEW ALL SCREEN (VERTICAL LIST)
+//-------------------------------------------------------
+
+@Composable
+fun DashboardSectionListScreen(
+    sectionType: DashboardSectionType,
+    navController: NavHostController
+) {
+    val items = remember { itemsForSection(sectionType) }
+
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                Brush.verticalGradient(
+                    listOf(
+                        MaterialTheme.colorScheme.background,
+                        MaterialTheme.colorScheme.surface
+                    )
+                )
+            ),
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+
+        item {
+            SectionHeader(
+                title = sectionType.headerTitle,
+                caption = sectionType.caption,
+                pillColor = sectionType.highlightColor,
+                viewButtonLabel = null,
+                onViewAction = {}
+            )
+        }
+
+        items(items, key = { it.title }) { item ->
+            HomeCard(
+                item = item,
+                highlightColor = sectionType.highlightColor,
+                modifier = Modifier.fillMaxWidth(),
+                onCardClick = { handleHomeItemNavigation(item, navController) }
+            )
+        }
+
+        item { Spacer(Modifier.height(8.dp)) }
     }
 }
 
@@ -557,13 +600,18 @@ fun HorizontalSectionList(items: List<HomeSectionItem>, highlightColor: Color) {
 //-------------------------------------------------------
 
 @Composable
-fun HomeCard(item: HomeSectionItem, highlightColor: Color) {
+fun HomeCard(
+    item: HomeSectionItem,
+    highlightColor: Color,
+    modifier: Modifier = Modifier,
+    height: Dp? = null,
+    onCardClick: (HomeSectionItem) -> Unit = {}
+) {
 
     Card(
-        modifier = Modifier
-            .width(260.dp)
-            .height(150.dp)
-            .clickable { },
+        modifier = modifier
+            .then(if (height != null) Modifier.height(height) else Modifier.wrapContentHeight())
+            .clickable { onCardClick(item) },
         shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
@@ -580,11 +628,11 @@ fun HomeCard(item: HomeSectionItem, highlightColor: Color) {
                         )
                     )
                 )
-                .padding(horizontal = 14.dp, vertical = 14.dp)
+                .padding(horizontal = 12.dp, vertical = 12.dp)
         ) {
 
             Column(
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
 
@@ -608,35 +656,19 @@ fun HomeCard(item: HomeSectionItem, highlightColor: Color) {
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurface
                     ),
-                    maxLines = 2
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
                 )
 
                 Text(
                     text = item.subtitle,
                     style = MaterialTheme.typography.bodyMedium.copy(
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                    )
+                    ),
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
                 )
 
-                Spacer(modifier = Modifier.weight(1f))
-
-                Row(
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "View details",
-                        style = MaterialTheme.typography.bodyMedium.copy(
-                            fontWeight = FontWeight.SemiBold,
-                            color = highlightColor
-                        )
-                    )
-                    Spacer(Modifier.width(6.dp))
-                    Icon(
-                        imageVector = Icons.Outlined.ArrowForward,
-                        contentDescription = null,
-                        tint = highlightColor
-                    )
-                }
             }
 
             Box(

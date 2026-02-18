@@ -34,7 +34,7 @@ class SplashActivity : ComponentActivity() {
                     Image(
                         painter = painterResource(id = R.drawable.ic_launcher),
                         contentDescription = "App icon",
-                        modifier = Modifier.size(140.dp)
+                        modifier = Modifier.size(200.dp)
                     )
                 }
 

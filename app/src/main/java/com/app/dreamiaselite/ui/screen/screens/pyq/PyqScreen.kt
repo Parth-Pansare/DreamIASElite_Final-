@@ -1,12 +1,6 @@
 package com.app.dreamiaselite.ui.screen.screens.pyq
 
-import android.content.ActivityNotFoundException
-import android.content.Context
-import android.content.Intent
-import android.graphics.Paint
-import android.graphics.pdf.PdfDocument
-import android.net.Uri
-import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -40,6 +34,9 @@ import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.PlayCircle
 import androidx.compose.material.icons.outlined.Quiz
 import androidx.compose.material.icons.outlined.WorkspacePremium
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -67,9 +64,10 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.navigation.NavController
+import androidx.navigation.NavHostController
+import android.net.Uri
 import kotlinx.coroutines.delay
 
 private data class PyqPaper(
@@ -82,7 +80,7 @@ private data class PyqPaper(
     val icon: ImageVector,
     val iconTint: Color,
     val iconBackground: Color,
-    val onViewPaper: () -> Unit = {}
+    val onAttempt: () -> Unit = {}
 )
 
 private data class PyqQuestion(
@@ -91,14 +89,19 @@ private data class PyqQuestion(
     val paper: String,
     val subject: String,
     val question: String,
-    val answer: String,
+    val options: List<String>,
+    val correctIndex: Int,
     val explanation: String
+)
+
+private data class PyqTestResult(
+    val paperId: String,
+    val selected: List<Int?>
 )
 
 @Composable
 fun PyqScreen(navController: NavController) {
 
-    val context = LocalContext.current
     val tabs = listOf("Year-wise", "Subject-wise")
     val selectedTab = remember { mutableStateOf(tabs.first()) }
     val years = listOf("2024", "2023", "2022", "2021", "2020")
@@ -110,8 +113,8 @@ fun PyqScreen(navController: NavController) {
     val basePapers = remember { providePyqPapers() }
     val papers = basePapers.map { paper ->
         paper.copy(
-            onViewPaper = {
-                openPaperPdf(context, paper, pyqQuestions.filter { it.paper == paper.title })
+            onAttempt = {
+                navController.navigate("pyq_test/${paper.id}")
             }
         )
     }
@@ -229,36 +232,392 @@ fun PyqPaperDetailScreen(navController: NavController, paperId: String) {
         Divider(color = Color(0xFFE0E4EC))
 
         filteredQuestions.forEachIndexed { index, q ->
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(14.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                elevation = CardDefaults.cardElevation(1.dp)
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                Column(
-                    modifier = Modifier.padding(14.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
+                Text(
+                    text = "Q${index + 1}. ${q.question}",
+                    style = MaterialTheme.typography.bodyLarge.copy(
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                )
+
+                q.options.forEachIndexed { optIndex, option ->
+                    val isCorrect = optIndex == q.correctIndex
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(
+                                if (isCorrect) Color(0xFFEAF7EF) else Color.Transparent
+                            )
+                            .padding(horizontal = 4.dp, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = ('A' + optIndex).toString(),
+                            style = MaterialTheme.typography.bodyMedium.copy(
+                                fontWeight = FontWeight.SemiBold,
+                                color = if (isCorrect) Color(0xFF1B6B35) else MaterialTheme.colorScheme.onSurface
+                            )
+                        )
+                        Text(
+                            text = option,
+                            style = MaterialTheme.typography.bodyMedium.copy(
+                                color = MaterialTheme.colorScheme.onSurface
+                            ),
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+
+                Text(
+                    text = "Correct: ${q.options[q.correctIndex]}",
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color(0xFF1B6B35)
+                    )
+                )
+                Text(
+                    text = "Explanation: ${q.explanation}",
+                    style = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f))
+                )
+            }
+            if (index < filteredQuestions.lastIndex) {
+                Divider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f))
+            }
+        }
+    }
+}
+
+// ----------------- PYQ Test (MCQ) -----------------
+
+@Composable
+fun PyqTestScreen(navController: NavHostController, paperId: String) {
+    val papers = remember { providePyqPapers() }
+    val questions = remember { providePyqQuestions() }
+    val paper = papers.find { it.id == paperId }
+    val filteredQuestions = remember(paperId) {
+        questions.filter { it.paper.equals(paper?.title, ignoreCase = true) }.take(10)
+    }
+
+    if (paper == null || filteredQuestions.isEmpty()) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text("No PYQ test available.", color = MaterialTheme.colorScheme.onSurface)
+        }
+        return
+    }
+
+    val total = filteredQuestions.size
+    var current by remember { mutableStateOf(0) }
+    var selected by remember { mutableStateOf(List(total) { null as Int? }) }
+    var showSubmitConfirm by remember { mutableStateOf(false to 0) }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 16.dp, vertical = 14.dp)
+                .padding(bottom = 80.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
                     Text(
-                        text = "Q${index + 1}. ${q.question}",
-                        style = MaterialTheme.typography.bodyLarge.copy(
-                            fontWeight = FontWeight.SemiBold,
+                        text = paper.title,
+                        style = MaterialTheme.typography.titleLarge.copy(
+                            fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                     )
                     Text(
-                        text = "Answer: ${q.answer}",
+                        text = "Question ${current + 1} of $total",
                         style = MaterialTheme.typography.bodyMedium.copy(
-                            fontWeight = FontWeight.SemiBold,
-                            color = Color(0xFF17612B)
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                         )
                     )
-                    Text(
-                        text = "Explanation: ${q.explanation}",
-                        style = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f))
+                }
+                AssistChip(
+                    onClick = {},
+                    label = { Text("${current + 1} / $total") },
+                    colors = AssistChipDefaults.assistChipColors(
+                        containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                        labelColor = MaterialTheme.colorScheme.primary
                     )
+                )
+            }
+
+            val q = filteredQuestions[current]
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Text(
+                    text = q.question,
+                    style = MaterialTheme.typography.bodyLarge.copy(
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    ),
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+
+                q.options.forEachIndexed { idx, option ->
+                    val isSelected = selected[current] == idx
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.08f) else Color.Transparent)
+                            .clickable {
+                                selected = selected.toMutableList().also {
+                                    it[current] = if (it[current] == idx) null else idx
+                                }
+                            }
+                            .padding(horizontal = 4.dp, vertical = 14.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = ('A' + idx).toString(),
+                            style = MaterialTheme.typography.bodyMedium.copy(
+                                fontWeight = FontWeight.SemiBold,
+                                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                            )
+                        )
+                        Text(
+                            text = option,
+                            style = MaterialTheme.typography.bodyMedium.copy(
+                                color = MaterialTheme.colorScheme.onSurface
+                            ),
+                            modifier = Modifier.weight(1f)
+                        )
+                        if (isSelected) {
+                            Icon(
+                                imageVector = Icons.Outlined.CheckCircle,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+                    if (idx < q.options.lastIndex) {
+                        Divider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f), thickness = 0.5.dp)
+                    }
                 }
             }
+        }
+
+        Row(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Button(
+                enabled = current > 0,
+                onClick = { current-- },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    contentColor = MaterialTheme.colorScheme.onSurface
+                )
+            ) { Text("Previous") }
+
+            Button(
+                onClick = {
+                    if (current < total - 1) {
+                        current++
+                    } else {
+                        val answered = selected.count { it != null }
+                        showSubmitConfirm = Pair(true, answered)
+                    }
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+            ) {
+                Text(if (current < total - 1) "Next" else "Submit", color = MaterialTheme.colorScheme.onPrimary)
+            }
+        }
+
+        val (confirmVisible, answeredCount) = showSubmitConfirm
+        if (confirmVisible) {
+            AlertDialog(
+                onDismissRequest = { showSubmitConfirm = false to 0 },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            val selectedString = selected.joinToString(",") { it?.toString() ?: "-1" }
+                            val encodedSelected = Uri.encode(selectedString)
+                            showSubmitConfirm = false to 0
+                            navController.navigate("pyq_test_result/$paperId?selected=$encodedSelected") {
+                                navController.currentDestination?.id?.let { popUpTo(it) { inclusive = true } }
+                                launchSingleTop = true
+                            }
+                        }
+                    ) { Text("Submit now") }
+                },
+                dismissButton = {
+                    Button(
+                        onClick = { showSubmitConfirm = false to 0 },
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surface)
+                    ) { Text("Continue test", color = MaterialTheme.colorScheme.onSurface) }
+                },
+                title = { Text("Submit test?") },
+                text = {
+                    Text(
+                        "Answered $answeredCount of $total. Submit now?",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+            )
+        }
+    }
+}
+
+@Composable
+fun PyqTestResultScreen(navController: NavHostController, paperId: String, selectedString: String?) {
+    val paperTitle = remember(paperId) {
+        providePyqPapers().find { it.id == paperId }?.title
+    }
+    val selected: List<Int?> = selectedString
+        ?.split(",")
+        ?.map { it.toIntOrNull()?.takeIf { v -> v >= 0 } }
+        ?: emptyList()
+
+    val questions = remember { providePyqQuestions() }
+    val filtered = questions.filter { it.paper.equals(paperTitle, ignoreCase = true) }
+        .take(10)
+
+    val popToPyq: () -> Unit = {
+        navController.popBackStack("pyq", inclusive = false)
+    }
+
+    BackHandler { popToPyq() }
+
+    if (filtered.isEmpty()) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text("No result to show.", color = MaterialTheme.colorScheme.onSurface)
+        }
+        return
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .verticalScroll(rememberScrollState())
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Text(
+            text = "PYQ Test Review",
+            style = MaterialTheme.typography.titleLarge.copy(
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+        )
+
+        filtered.forEachIndexed { index, q ->
+            val user = selected.getOrNull(index)
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Text(
+                    text = "Q${index + 1}. ${q.question}",
+                    style = MaterialTheme.typography.bodyLarge.copy(
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                )
+
+                q.options.forEachIndexed { optIndex, option ->
+                    val isCorrect = optIndex == q.correctIndex
+                    val isUser = optIndex == user
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(
+                                when {
+                                    isCorrect -> Color(0xFFEAF7EF)
+                                    isUser -> MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
+                                    else -> Color.Transparent
+                                }
+                            )
+                            .padding(horizontal = 4.dp, vertical = 10.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = ('A' + optIndex).toString(),
+                            style = MaterialTheme.typography.bodyMedium.copy(
+                                fontWeight = FontWeight.SemiBold,
+                                color = when {
+                                    isCorrect -> Color(0xFF1B6B35)
+                                    isUser -> MaterialTheme.colorScheme.primary
+                                    else -> MaterialTheme.colorScheme.onSurface
+                                }
+                            )
+                        )
+                        Text(
+                            text = option,
+                            style = MaterialTheme.typography.bodyMedium.copy(
+                                color = MaterialTheme.colorScheme.onSurface
+                            ),
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+
+                Text(
+                    text = "Correct: ${q.options[q.correctIndex]}",
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color(0xFF1B6B35)
+                    )
+                )
+                Text(
+                    text = "Explanation: ${q.explanation}",
+                    style = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f))
+                )
+            }
+            if (index < filtered.lastIndex) {
+                Divider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f))
+            }
+        }
+
+        Button(
+            modifier = Modifier.fillMaxWidth(),
+            onClick = { popToPyq() },
+            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+        ) {
+            Text("Back to PYQs", color = MaterialTheme.colorScheme.onPrimary)
         }
     }
 }
@@ -512,13 +871,13 @@ private fun PyqPaperCard(paper: PyqPaper) {
 
             Button(
                 modifier = Modifier.fillMaxWidth(),
-                onClick = paper.onViewPaper,
+                onClick = paper.onAttempt,
                 colors = ButtonDefaults.buttonColors(
                     containerColor = Color(0xFF111827),
                     contentColor = Color.White
                 )
             ) {
-                Text("View Paper")
+                Text("Attempt now")
             }
         }
     }
@@ -764,53 +1123,213 @@ private fun providePyqPapers(): List<PyqPaper> = listOf(
     )
 )
 
-private fun providePyqQuestions(): List<PyqQuestion> = listOf(
-    PyqQuestion(
-        id = "2024_gs1_1",
-        year = "2024",
-        paper = "GS Paper 1",
-        subject = "History",
-        question = "With reference to the Indian National Movement, what was the immediate cause of launching the Non-Cooperation Movement in 1920?",
-        answer = "The Rowlatt Act and Jallianwala Bagh massacre",
-        explanation = "Gandhi launched the Non-Cooperation Movement after the repressive Rowlatt Act and the Jallianwala Bagh massacre in 1919."
-    ),
-    PyqQuestion(
-        id = "2023_gs1_1",
-        year = "2023",
-        paper = "GS Paper 1",
-        subject = "Geography",
-        question = "Why do tropical cyclones not originate in the South Atlantic and South Eastern Pacific Oceans?",
-        answer = "Due to weak Coriolis force and cooler sea surface temperatures",
-        explanation = "Cooler waters and weak Coriolis force near the equator in these basins inhibit cyclone formation."
-    ),
-    PyqQuestion(
-        id = "2022_gs2_1",
-        year = "2022",
-        paper = "GS Paper 2",
-        subject = "Polity",
-        question = "Discuss the significance of the 102nd Constitutional Amendment for the backward class commissions in India.",
-        answer = "It gave constitutional status to the National Commission for Backward Classes under Article 338B.",
-        explanation = "The amendment introduced Articles 338B and 342A, making NCBC a constitutional body and detailing central and state lists of SEBCs."
-    ),
-    PyqQuestion(
-        id = "2021_gs3_1",
-        year = "2021",
-        paper = "GS Paper 3",
-        subject = "Economy",
-        question = "What are Minimum Support Prices (MSP) and how do they impact farmers' income?",
-        answer = "MSP is a pre-announced price at which government procures crops; it provides price assurance and reduces income volatility.",
-        explanation = "MSP cushions farmers against market crashes, incentivises crop choices, and stabilises incomes when procurement occurs."
-    ),
-    PyqQuestion(
-        id = "2020_csat_1",
-        year = "2020",
-        paper = "CSAT",
-        subject = "Reasoning",
-        question = "If A is thrice as good a worker as B, and together they finish a work in 18 days, how long would B alone take?",
-        answer = "72 days",
-        explanation = "A's rate = 3B. Combined rate 4B = 1/18 -> B = 1/72, so B alone takes 72 days."
+private fun providePyqQuestions(): List<PyqQuestion> {
+    fun mcq(
+        idSuffix: Int,
+        year: String,
+        paper: String,
+        subject: String,
+        stem: String,
+        options: List<String>,
+        correct: Int,
+        explanation: String
+    ) = PyqQuestion(
+        id = "${year}_${paper}_${idSuffix}",
+        year = year,
+        paper = paper,
+        subject = subject,
+        question = stem,
+        options = options,
+        correctIndex = correct,
+        explanation = explanation
     )
-)
+
+    val gs1 = List(10) { idx ->
+        mcq(
+            idSuffix = idx + 1,
+            year = "2024",
+            paper = "GS Paper 1",
+            subject = if (idx % 2 == 0) "History" else "Geography",
+            stem = when (idx) {
+                0 -> "Immediate cause for launching the Non-Cooperation Movement (1920) was:"
+                1 -> "Tropical cyclones are rare in the South Atlantic because:"
+                2 -> "Gupta era is associated with:"
+                3 -> "The ITCZ shifts north over India in July mainly due to:"
+                4 -> "Ajanta paintings primarily depict:"
+                5 -> "Pallava architecture is best exemplified by:"
+                6 -> "Rock-cut caves at Elephanta are dedicated to:"
+                7 -> "The Khilafat Movement leaders were:"
+                8 -> "Chola naval expeditions reached:"
+                else -> "India’s monsoon trough in July lies:"
+            },
+            options = when (idx) {
+                0 -> listOf("Failure of Khilafat talks", "Economic depression", "Rowlatt Act & Jallianwala Bagh", "Arrest of Congress leaders")
+                1 -> listOf("Warm SST & strong shear", "Cool SST & strong shear", "Strong Coriolis & high humidity", "Frequent ENSO stability")
+                2 -> listOf("Decimal system & Ajanta murals", "Iron pillar & chaityas", "Vedic rituals", "Greek coinage")
+                3 -> listOf("Southern Hemisphere heating", "Northern landmass heating", "ITCZ anchored at equator", "High Antarctic pressure")
+                4 -> listOf("Buddha’s life events", "Bhakti saints", "Gupta kings", "Delhi Sultanate")
+                5 -> listOf("Lingaraja temple", "Shore & Kailasanatha temples", "Sun temple Modhera", "Dilwara temples")
+                6 -> listOf("Vishnu", "Shiva", "Buddha", "Jaina Tirthankaras")
+                7 -> listOf("Ali brothers", "Tilak and Lajpat Rai", "Nehru and Bose", "Gokhale and Ranade")
+                8 -> listOf("Persian Gulf", "Sri Lanka", "Southeast Asia", "East Africa only")
+                else -> listOf("Along 20°S", "South of equator", "Across the Indo-Gangetic plains", "Over Arabian Sea")
+            },
+            correct = when (idx) {
+                0 -> 2
+                1 -> 1
+                2 -> 0
+                3 -> 1
+                4 -> 0
+                5 -> 1
+                6 -> 1
+                7 -> 0
+                8 -> 2
+                else -> 2
+            },
+            explanation = "PYQ-style MCQ for practice."
+        )
+    }
+
+    val gs2 = List(10) { idx ->
+        mcq(
+            idSuffix = idx + 1,
+            year = "2023",
+            paper = "GS Paper 2",
+            subject = if (idx % 2 == 0) "Polity" else "Governance",
+            stem = when (idx) {
+                0 -> "102nd Constitutional Amendment primarily:"
+                1 -> "MSPs are recommended by:"
+                2 -> "Money Bill can be introduced in:"
+                3 -> "8th Schedule relates to:"
+                4 -> "Tenth Schedule deals with:"
+                5 -> "NCBC got constitutional status via:"
+                6 -> "Article 368 refers to:"
+                7 -> "CAG is appointed by:"
+                8 -> "Minimum age for Rajya Sabha member:"
+                else -> "Anti-defection applies to:"
+            },
+            options = listOf(
+                "Constitutional status to NCBC",
+                "NITI Aayog",
+                "Lok Sabha only",
+                "Languages",
+                "Anti-defection",
+                "102nd Amendment",
+                "Constitutional amendment procedure",
+                "President",
+                "30 years",
+                "Members switching parties"
+            ),
+            correct = when (idx) {
+                0 -> 0
+                1 -> 1
+                2 -> 2
+                3 -> 3
+                4 -> 4
+                5 -> 5
+                6 -> 6
+                7 -> 7
+                8 -> 8
+                else -> 9
+            },
+            explanation = "Core polity/governance factual MCQ."
+        )
+    }
+
+    val gs3 = List(10) { idx ->
+        mcq(
+            idSuffix = idx + 1,
+            year = "2022",
+            paper = "GS Paper 3",
+            subject = "Economy & Environment",
+            stem = when (idx) {
+                0 -> "MSP primarily aims to:"
+                1 -> "Repo rate is:"
+                2 -> "GST is a:"
+                3 -> "IIP is published by:"
+                4 -> "FRBM stands for:"
+                5 -> "Balance of Payments includes:"
+                6 -> "Montreal Protocol targets:"
+                7 -> "Paris Agreement aims to limit warming:"
+                8 -> "CITES regulates:"
+                else -> "Ramsar sites refer to:"
+            },
+            options = when (idx) {
+                0 -> listOf("Export competitiveness", "Price assurance to farmers", "Reduce subsidy", "Promote coarse cereals")
+                1 -> listOf("Rate banks lend to RBI", "Rate RBI lends to banks", "Rate for deposits", "Rate for savings")
+                2 -> listOf("Direct tax", "Destination-based indirect tax", "Origin-based tax", "Wealth tax")
+                3 -> listOf("NITI", "RBI", "NSO", "SEBI")
+                4 -> listOf("Fiscal Responsibility and Budget Management", "Financial Reform Board Mandate", "Fiscal Reserve Benchmark", "Federal Resource Budgeting")
+                5 -> listOf("Only current account", "Only capital account", "Both current and capital", "Only FX reserves")
+                6 -> listOf("GHGs", "ODS", "Marine pollution", "POPs")
+                7 -> listOf("Below 3°C", "Below 2°C and pursue 1.5°C", "Equal cuts for all", "No targets")
+                8 -> listOf("Endangered species trade", "Ozone layer", "Carbon markets", "Ship emissions")
+                else -> listOf("Wetlands", "Forests", "Deserts", "Mountains")
+            },
+            correct = when (idx) {
+                0 -> 1
+                1 -> 1
+                2 -> 1
+                3 -> 2
+                4 -> 0
+                5 -> 2
+                6 -> 1
+                7 -> 1
+                8 -> 0
+                else -> 0
+            },
+            explanation = "Key economy/environment objective MCQ."
+        )
+    }
+
+    val csat = List(10) { idx ->
+        mcq(
+            idSuffix = idx + 1,
+            year = "2021",
+            paper = "CSAT",
+            subject = "Reasoning",
+            stem = when (idx) {
+                0 -> "A is thrice as efficient as B; together finish in 18 days. B alone takes:"
+                1 -> "Speed-time-distance basic relation:"
+                2 -> "If profit is ₹20 on cost ₹100, profit % is:"
+                3 -> "Average of first ten natural numbers is:"
+                4 -> "If SP = CP, then profit/loss is:"
+                5 -> "Two trains 60 km/h and 40 km/h opposite directions, relative speed:"
+                6 -> "Simple interest at 10% on ₹1000 for 2 years:"
+                7 -> "Ratio 2:3 equals fraction:"
+                8 -> "If a:b=2:5 and b:c=3:4, a:c ="
+                else -> "If x+y=10 and x−y=2, x="
+            },
+            options = when (idx) {
+                0 -> listOf("54 days", "72 days", "90 days", "108 days")
+                1 -> listOf("S = D/T", "T = S/D", "D = S×T", "All of these")
+                2 -> listOf("10%", "15%", "20%", "25%")
+                3 -> listOf("4.5", "5.5", "6", "6.5")
+                4 -> listOf("Profit", "Loss", "Break-even", "Cannot say")
+                5 -> listOf("20 km/h", "40 km/h", "60 km/h", "100 km/h")
+                6 -> listOf("₹100", "₹150", "₹200", "₹250")
+                7 -> listOf("2/5", "3/5", "2/3", "3/2")
+                8 -> listOf("2:3", "6:20", "6:10", "15:8")
+                else -> listOf("4", "6", "8", "10")
+            },
+            correct = when (idx) {
+                0 -> 1
+                1 -> 3
+                2 -> 2
+                3 -> 1
+                4 -> 2
+                5 -> 3
+                6 -> 2
+                7 -> 0
+                8 -> 3
+                else -> 1
+            },
+            explanation = "Basic CSAT arithmetic/logic practice."
+        )
+    }
+
+    return gs1 + gs2 + gs3 + csat
+}
 
 
 private fun Modifier.clickableWithoutRipple(onClick: () -> Unit): Modifier = composed {
@@ -819,73 +1338,4 @@ private fun Modifier.clickableWithoutRipple(onClick: () -> Unit): Modifier = com
         indication = null,
         onClick = onClick
     )
-}
-
-private fun openPaperPdf(
-    context: Context,
-    paper: PyqPaper,
-    questions: List<PyqQuestion>
-) {
-    runCatching {
-        val fileName = "pyq_${paper.id}.pdf"
-        val file = java.io.File(context.cacheDir, fileName)
-
-        val doc = PdfDocument()
-        val paint = Paint().apply {
-            textSize = 12f
-            isAntiAlias = true
-            color = android.graphics.Color.BLACK
-        }
-
-        val pageWidth = 595
-        val pageHeight = 842
-        var y = 40f
-
-        fun newPage(): PdfDocument.Page {
-            val pageInfo = PdfDocument.PageInfo.Builder(pageWidth, pageHeight, doc.pages.size + 1).create()
-            val page = doc.startPage(pageInfo)
-            y = 40f
-            return page
-        }
-
-        var page = newPage()
-
-        fun writeLine(text: String) {
-            if (y > pageHeight - 40) {
-                doc.finishPage(page)
-                page = newPage()
-            }
-            page.canvas.drawText(text, 40f, y, paint)
-            y += 18f
-        }
-
-        writeLine(paper.title)
-        writeLine(paper.questions)
-        writeLine("")
-
-        questions.forEachIndexed { index, q ->
-            writeLine("Q${index + 1}: ${q.question}")
-            writeLine("Answer: ${q.answer}")
-            writeLine("Explanation: ${q.explanation}")
-            writeLine("")
-        }
-
-        doc.finishPage(page)
-        file.outputStream().use { out -> doc.writeTo(out) }
-        doc.close()
-
-        val uri = androidx.core.content.FileProvider.getUriForFile(
-            context,
-            "${context.packageName}.fileprovider",
-            file
-        )
-
-        val intent = Intent(Intent.ACTION_VIEW).apply {
-            setDataAndType(uri, "application/pdf")
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NO_HISTORY)
-        }
-        context.startActivity(intent)
-    }.onFailure {
-        Toast.makeText(context, "No PDF viewer found.", Toast.LENGTH_SHORT).show()
-    }
 }
