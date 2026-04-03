@@ -1,17 +1,15 @@
+# Gradle local cache/wrapper (never commit these)
 .gradle/
 .gradle-local/
 .gradle-local-new/
 build/
+
+# Android build outputs
+*.apk
+*.aab
+*.class
+
+# Local config
 local.properties
-.idea/
-.kotlin/
 *.iml
-
-# temp files
-tmp*
-_tmp*
-*.log
-
-# images (optional if not needed)
-*.png
-*.jpg
+.idea/
