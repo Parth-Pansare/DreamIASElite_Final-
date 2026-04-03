@@ -1,15 +1,4 @@
-# Gradle local cache/wrapper (never commit these)
-.gradle/
-.gradle-local/
-.gradle-local-new/
-build/
-
-# Android build outputs
-*.apk
-*.aab
-*.class
-
-# Local config
-local.properties
-*.iml
-.idea/
+.gradle/ 
+.gradle-local/ 
+.gradle-local-new/ 
+build/ 
