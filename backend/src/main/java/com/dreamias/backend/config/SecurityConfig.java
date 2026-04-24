@@ -36,7 +36,7 @@ public class SecurityConfig {
                 // Allow public content viewing
                 .requestMatchers("/content/subjects", "/content/units/**", "/content/topics/**", "/content/questions/**").permitAll()
                 // Secure Admin endpoints
-                .requestMatchers("/content/admin/**").hasRole("ADMIN")
+                .requestMatchers("/content/admin/**", "/admin/review/**", "/articles/admin/**").hasRole("ADMIN")
                 // All other requests require authentication
                 .anyRequest().authenticated()
             )

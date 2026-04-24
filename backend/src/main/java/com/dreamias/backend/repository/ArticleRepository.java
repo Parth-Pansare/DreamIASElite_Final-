@@ -8,5 +8,5 @@ import java.util.List;
 @Repository
 public interface ArticleRepository extends JpaRepository<Article, Long> {
     List<Article> findByCategory(String category);
-    List<Article> findByOrderByPublishedAtDesc();
+    List<Article> findByStatusOrderByPublishedAtDesc(com.dreamias.backend.entity.ContentStatus status);
 }

@@ -8,7 +8,6 @@ import java.util.Optional;
 
 @Repository
 public interface QuestionRepository extends JpaRepository<Question, Long> {
-    List<Question> findByTopicId(Long topicId);
-    List<Question> findByPaperId(Long paperId);
-    Optional<Question> findByPrompt(String prompt);
+    List<Question> findByTopicIdAndStatus(Long topicId, com.dreamias.backend.entity.ContentStatus status);
+    List<Question> findByStatus(com.dreamias.backend.entity.ContentStatus status);
 }

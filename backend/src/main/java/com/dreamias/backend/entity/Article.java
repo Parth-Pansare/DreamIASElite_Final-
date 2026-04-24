@@ -23,6 +23,10 @@ public class Article {
     private String category; // e.g., National, International, Economy
     private String importance; // High, Medium, Low
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private ContentStatus status = ContentStatus.PENDING;
+
     @Column(name = "published_at")
     private LocalDateTime publishedAt;
 

@@ -26,6 +26,10 @@ public class Question {
     @Column(columnDefinition = "TEXT")
     private String explanation;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private ContentStatus status = ContentStatus.PENDING;
+
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
